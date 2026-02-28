@@ -1,0 +1,11 @@
+// Tower signal routing
+// Q0.0 = (I0.0 AND I0.1) OR
+// (I0.2 AND NOT I0.3)
+L D
+A I0.1
+L D
+AN I0.3
+= Q0.0
+// Indicator lamp
+L D
+= Q0.1
