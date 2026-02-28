@@ -42,7 +42,7 @@
     return s;
   }
 
-  /** Parse L (load). If value is W#base#value, return stl_l_time with VALUE and SCALE; else stl_l. */
+  /** Parse L (load). Tower LCC+Q L is load timer definition only (W#base#value). Other L values (e.g. L D) are not valid; return null to skip. */
   function parseL(rest) {
     rest = (rest || '').trim();
     var match = /^W#(\d)#(\d+)$/i.exec(rest);
@@ -53,7 +53,7 @@
         return { type: 'stl_l_time', fields: { VALUE: val, SCALE: String(base) } };
       }
     }
-    return { type: 'stl_l', fields: { VALUE: rest || '' } };
+    return null;
   }
 
   function blockXml(type, fields, nextXml) {
@@ -198,6 +198,12 @@
       }
       if ((m = new RegExp('^AN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_and_not', fields: { VAR: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^LD' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_and', fields: { VAR: normVar(m[1]) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;

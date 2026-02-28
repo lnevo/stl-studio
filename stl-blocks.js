@@ -132,7 +132,7 @@
       previousStatement: null,
       nextStatement: null,
       colour: 200,
-      tooltip: 'Set the delay: count × scale (e.g. 2 × 1 s = 2 s, 1 × 100 ms = 0.1 s). Use before “Start timer”.',
+      tooltip: 'L (load) on Tower LCC+Q is load timer definition only. Set the delay: count × scale (e.g. 2 × 1 s = 2 s, 1 × 100 ms = 0.1 s). Use before “Start timer”.',
     },
     {
       type: 'stl_sd',

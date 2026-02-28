@@ -2,13 +2,13 @@
 
 **Live:** [https://lnevo.github.io/stl-studio](https://lnevo.github.io/stl-studio)
 
-A visual editor that generates **STL (Statement List)** code for the [Tower LCC+Q](https://www.rr-cirkits.com/) device (RR-CirKits 16 I/O LCC node with built-in PLC-style logic). Build logic by snapping pieces together; export the STL and paste it into your node or [JMRI’s STL Editor](https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml).
+A visual editor that generates **STL (Statement List)** code for the [Tower LCC+Q](https://www.rr-cirkits.com/) device (RR-CirKits 16 I/O LCC node with built-in PLC-style logic). Build logic by snapping pieces together; export the STL and copy it into your node via **Configure Nodes**.
 
 ![STL Studio](screenshot.png)
 
 ## Why
 
-Writing STL by hand is error-prone. STL Studio lets you build logic by snapping pieces together (Scratch/Blockly style); the **Generate STL** button produces the exact STL text you can paste into the Tower LCC+Q or JMRI’s STL Editor.
+Writing STL by hand is error-prone. STL Studio lets you build logic by snapping pieces together (Scratch/Blockly style); the **Generate STL** button produces the exact STL text you copy into the node via Configure Nodes.
 
 ## Quick start
 
@@ -26,7 +26,7 @@ Writing STL by hand is error-prone. STL Studio lets you build logic by snapping 
 3. **Generate STL**  
    - Click **Generate STL** (or edit blocks; the panel updates automatically).
 4. **Copy**  
-   - Click **Copy to clipboard** and paste into your Tower LCC+Q / JMRI STL Editor.
+   - Click **Copy to clipboard** and paste into your Tower LCC+Q node via **Configure Nodes**.
 5. **Import STL**  
    - Click **Import STL…**, paste existing STL code (one statement per line), then **Import into workspace** to create blocks from it.
 
@@ -42,14 +42,14 @@ Writing STL by hand is error-prone. STL Studio lets you build logic by snapping 
 | Assign result to Q/Z/M | `= Qx.x` / `= Zx.x` / `= Mx.x` |
 | Set bit           | `S Qx.x` / `S Mx.x` |
 | Reset (bit or timer) | `R Qx.x` / `R Mx.x` / `R Tn` |
-| L (load)          | `L W#2#1` (or other value) |
+| L (load timer)    | `L W#2#1` (timer preset only; e.g. L D is not valid) |
 | SD (start timer)  | `SD Tn`     |
 | FR (free timer)   | `FR Tn`     |
 | Label             | `E1:`       |
 | JC / JCN / JU     | `JC E1` / `JCN E1` / `JU E1` |
 | Comment           | `// ...`    |
 
-**Variables (per Tower LCC+Q / JMRI STL Editor):**
+**Variables (per Tower LCC+Q):**
 
 - **I** – Logic inputs (LCC events → logic): `I0.0`–`I15.7` (128)
 - **Q** – Logic outputs (logic → LCC events): `Q0.0`–`Q15.7` (128)
@@ -60,7 +60,7 @@ Writing STL by hand is error-prone. STL Studio lets you build logic by snapping 
 
 Logic runs every 20 ms; LCC events are consumed in `I` and produced on `Q` when outputs change.
 
-**Tips (per JMRI STL Editor):**
+**Tips:**
 
 - **Labels** — Use 1–4 characters plus a colon (e.g. `E1:`, `AB1:`). Jump targets (JC/JCN/JU) use these names.
 - **Reserved names** — `T0` through `T63` are reserved for timers. Don’t use them as I/Q/Y/Z names, and avoid mentioning them in comments (e.g. avoid “Set T1 closed”) so the node doesn’t get confused.

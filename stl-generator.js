@@ -49,7 +49,13 @@
   stlGenerator.forBlock['stl_l'] = function (block, gen) {
     var v = (block.getFieldValue('VALUE') || '').trim();
     if (!v) return withNext(block, gen, '');
-    return withNext(block, gen, 'L ' + v + '\n');
+    var match = /^W#(\d)#(\d+)$/i.exec(v);
+    if (match) {
+      var base = parseInt(match[1], 10);
+      var val = parseInt(match[2], 10);
+      if (base >= 1 && base <= 4 && val >= 0 && val <= 999) return withNext(block, gen, 'L W#' + base + '#' + val + '\n');
+    }
+    return withNext(block, gen, '');
   };
 
   stlGenerator.forBlock['stl_l_time'] = function (block, gen) {
