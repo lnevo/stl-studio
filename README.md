@@ -98,12 +98,12 @@ A     T3
 
 When I1.0 is true, the timer starts. `A T3` is a one-instruction logic string: Q1.0 stays false until the timer finishes, then Q1.0 is set true.
 
-- **Reference:** `Understanding the STL Logic String.pdf` (in this folder)
+- **Reference:** [Understanding the STL Logic String](https://groups.io/g/layoutcommandcontrol/files/Understanding%20the%20STL%20Logic%20String.pdf) (PDF)
 - **Simulate STL and view RLO/FC:** [Q-debugger](https://layoutcommand.store/q-debugger) (web-based)
 
 ## Reference
 
 - [JMRI OpenLCB STL Editor](https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml)
-- Tower LCC+Q manual (e.g. `TowerLCC+Q-manual-d.pdf` in this repo if present)
-- **Understanding the STL Logic String** — `Understanding the STL Logic String.pdf` (this folder)
+- [Tower LCC+Q manual](https://www.rr-cirkits.com/manuals/TowerLCC+Q-manual-d.pdf) (RR-CirKits)
+- [Understanding the STL Logic String](https://groups.io/g/layoutcommandcontrol/files/Understanding%20the%20STL%20Logic%20String.pdf) (PDF)
 - [Q-debugger](https://layoutcommand.store/q-debugger) — simulate STL and display control bits (RLO, /FC)

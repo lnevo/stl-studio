@@ -48,6 +48,26 @@
       font-size: 0.8rem;
       color: var(--muted);
     }
+    .header-github {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      padding-right: 0.75rem;
+    }
+    .header-github a {
+      display: flex;
+      align-items: center;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .header-github a:hover {
+      color: var(--accent);
+    }
+    .header-github img {
+      width: 24px;
+      height: 24px;
+      display: block;
+    }
     .header-actions {
       display: flex;
       align-items: center;
@@ -226,6 +246,11 @@
     <div>
       <h1>STL Studio</h1>
       <p>Build logic for Tower LCC+Q; copy the generated STL into your node (e.g. via JMRI STL Editor).</p>
+    </div>
+    <div class="header-github">
+      <a href="https://github.com/lnevo/stl-studio" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
+        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="" width="24" height="24">
+      </a>
     </div>
     <div class="header-actions">
       <button type="button" id="btnGenerate" class="primary">Generate STL</button>
