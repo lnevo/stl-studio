@@ -214,7 +214,18 @@
       previousStatement: null,
       nextStatement: null,
       colour: 230,
-      tooltip: 'Add a note for yourself; ignored when generating code. Avoid writing T0–T63 in comments (reserved for timers).',
+      tooltip: 'Add a note for yourself; appears as // in STL. Avoid writing T0–T63 in comments (reserved for timers).',
+    },
+    {
+      type: 'stl_group',
+      message0: 'Group name (for CSV / backup): %1',
+      args0: [
+        { type: 'field_input', name: 'NAME', text: 'Default', maxLength: 60 },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      colour: 200,
+      tooltip: 'Starts a named group. Exported as "Group N: name" in CSV and config backup (like Tower LCC+Q Group Description). Place before the blocks that belong to this group.',
     },
   ]);
 })(typeof window !== 'undefined' ? window : this);

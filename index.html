@@ -382,9 +382,12 @@
           },
           {
             kind: 'category',
-            name: 'Comment',
+            name: 'Comment & group',
             colour: '#8b6914',
-            contents: [{ kind: 'block', type: 'stl_comment' }]
+            contents: [
+              { kind: 'block', type: 'stl_group' },
+              { kind: 'block', type: 'stl_comment' }
+            ]
           }
         ]
       };
@@ -487,6 +490,7 @@
 
       function updateStl() {
         try {
+          if (window.stlGenerator) window.stlGenerator.groupIndex = 0;
           lastCode = window.stlGenerator ? window.stlGenerator.workspaceToCode(ws) : '';
         } catch (e) {
           lastCode = '// Error: ' + (e.message || String(e));
@@ -531,24 +535,37 @@
         URL.revokeObjectURL(a.href);
       };
 
-      /** Quote a CSV field for JMRI: always wrap in quotes, escape internal " as "". */
-      function quoteCsvField(s) {
-        if (s == null) return '""';
-        return '"' + String(s).replace(/"/g, '""') + '"';
+      /** JMRI-style CSV: quote only when value contains comma, newline, or "; empty first column = "". */
+      function needQuote(s) {
+        if (s == null) return false;
+        var t = String(s);
+        return t.indexOf('"') >= 0 || t.indexOf(',') >= 0 || t.indexOf('\n') >= 0;
+      }
+      function formatCsvCell(val, isFirstCol) {
+        var empty = val == null || val === '';
+        if (empty) return isFirstCol ? '""' : '';
+        if (needQuote(val)) return '"' + String(val).replace(/"/g, '""') + '"';
+        return String(val);
+      }
+      function formatCsvSingle(val) {
+        if (val == null || val === '') return '""';
+        if (needQuote(val)) return '"' + String(val).replace(/"/g, '""') + '"';
+        return String(val);
       }
 
       function stlToJmriCsv(stlReadable) {
         if (!stlReadable || stlReadable.indexOf('// No blocks') === 0) return null;
         var lines = stlReadable.split('\n');
         var header = ['Group Name', 'Label', 'Operator', 'Name', 'Comment'];
-        var rows = [header];
+        var rows = [];
         var opList = ['CLR', 'SET', 'A', 'O', 'AN', 'ON', 'NOT', '=', 'S', 'R', 'L', 'SD', 'FR', 'JC', 'JCN', 'JU'];
-        var rowNum = 0;
         for (var i = 0; i < lines.length; i++) {
           var line = lines[i].trim();
-          if (!line) continue;
-          rowNum++;
-          var groupName = String(rowNum);
+          if (line === '') {
+            rows.push({ empty: true });
+            continue;
+          }
+          var groupName = '';
           var label = '';
           var comment = '';
           var commentIdx = line.indexOf('//');
@@ -557,7 +574,7 @@
             line = line.slice(0, commentIdx).trim();
           }
           if (!line && comment) {
-            rows.push([groupName, '', '', '', comment]);
+            rows.push({ single: comment });
             continue;
           }
           if (!line) continue;
@@ -579,7 +596,28 @@
           }
           rows.push([groupName, label, op, name, comment]);
         }
-        return rows.map(function (r) { return r.map(quoteCsvField).join(','); }).join('\r\n');
+        var out = [header.join(',')];
+        var needGroupHeader = true;
+        for (var j = 0; j < rows.length; j++) {
+          var r = rows[j];
+          if (r.empty) {
+            out.push('""');
+          } else if (r.single !== undefined) {
+            if (needGroupHeader) {
+              out.push(formatCsvSingle(/^Group\s+\d+:\s*.+/.test(r.single) ? r.single : 'Group 0: ' + r.single));
+              needGroupHeader = false;
+            } else {
+              out.push(formatCsvSingle(r.single));
+            }
+          } else {
+            if (needGroupHeader) {
+              out.push(formatCsvSingle('Group 0: Default'));
+              needGroupHeader = false;
+            }
+            out.push(r.map(function (v, idx) { return formatCsvCell(v, idx === 0); }).join(','));
+          }
+        }
+        return out.join('\r\n');
       }
 
       document.getElementById('btnDownloadCsv').onclick = function () {
@@ -704,7 +742,7 @@
         var groupIdx = header.findIndex(function (h) { return /Group Name/i.test(h); });
         var labelIdx = header.findIndex(function (h) { return /Label/i.test(h); });
         var opIdx = header.findIndex(function (h) { return /Operator/i.test(h); });
-        var nameIdx = header.findIndex(function (h) { return /Name/i.test(h); });
+        var nameIdx = header.findIndex(function (h) { return (h || '').trim().toLowerCase() === 'name'; });
         var commentIdx = header.findIndex(function (h) { return /Comment/i.test(h); });
         if (opIdx < 0) return null;
         var opList = ['CLR', 'SET', 'A', 'O', 'AN', 'ON', 'NOT', '=', 'S', 'R', 'L', 'SD', 'FR', 'JC', 'JCN', 'JU'];
@@ -716,8 +754,18 @@
           var op = (fields[opIdx] || '').trim().toUpperCase();
           var name = nameIdx >= 0 ? (fields[nameIdx] || '').trim() : '';
           var comment = commentIdx >= 0 ? (fields[commentIdx] || '').trim() : '';
-          if (fields.length <= 2 && fields[0] && opList.indexOf((fields[0] || '').trim().toUpperCase()) >= 0) op = (fields[0] || '').trim().toUpperCase();
+          var first = (fields[0] || '').trim();
+          if (fields.length <= 2 && first && opList.indexOf(first.toUpperCase()) >= 0) op = first.toUpperCase();
           if (fields.length <= 2 && fields[1] && !name && (fields[1] || '').trim()) name = (fields[1] || '').trim();
+          if (fields.length === 1 && first && first.indexOf(' ') >= 0) {
+            var parts = first.split(/\s+/);
+            if (parts.length >= 2 && opList.indexOf(parts[0].toUpperCase()) >= 0) {
+              op = parts[0].toUpperCase();
+              if (!name) name = parts.slice(1).join(' ').trim();
+            }
+          }
+          if (fields.length === 1 && first && !op && !label && /^[A-Za-z0-9]{1,4}$/.test(first)) label = first;
+          if (fields.length >= 1 && first && !op && !label && !comment) comment = first;
           if (!op && !label && !comment) continue;
           var line = '';
           if (label) line += label + (label.indexOf(':') >= 0 ? ' ' : ': ');

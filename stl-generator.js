@@ -106,6 +106,12 @@
     var line = text ? '// ' + text + '\n' : '';
     return withNext(block, gen, line);
   };
+  stlGenerator.forBlock['stl_group'] = function (block, gen) {
+    var name = (block.getFieldValue('NAME') || 'Default').trim() || 'Default';
+    var n = typeof gen.groupIndex === 'number' ? gen.groupIndex : 0;
+    gen.groupIndex = n + 1;
+    return withNext(block, gen, '// Group ' + n + ': ' + name + '\n');
+  };
 
   global.stlGenerator = stlGenerator;
 })(typeof window !== 'undefined' ? window : this);

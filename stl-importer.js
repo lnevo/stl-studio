@@ -82,7 +82,14 @@
       comment = raw.slice(commentIdx + 2).trim();
       raw = raw.slice(0, commentIdx).trim();
     }
-    if (!raw) return comment ? { type: 'stl_comment', fields: { TEXT: comment } } : null;
+    if (!raw) {
+      if (comment) {
+        var groupMatch = /^Group\s+(\d+):\s*(.*)$/.exec(comment);
+        if (groupMatch) return { type: 'stl_group', fields: { NAME: (groupMatch[2] || '').trim() || 'Default' } };
+        return { type: 'stl_comment', fields: { TEXT: comment } };
+      }
+      return null;
+    }
 
     var parts = raw.split(/\s+/);
     var op = (parts[0] || '').toUpperCase();
@@ -155,7 +162,14 @@
       comment = raw.slice(commentIdx + 2).trim();
       raw = raw.slice(0, commentIdx).trim();
     }
-    if (!raw) return comment ? [{ type: 'stl_comment', fields: { TEXT: comment } }] : [];
+    if (!raw) {
+      if (comment) {
+        var groupMatch = /^Group\s+(\d+):\s*(.*)$/.exec(comment);
+        if (groupMatch) return [{ type: 'stl_group', fields: { NAME: (groupMatch[2] || '').trim() || 'Default' } }];
+        return [{ type: 'stl_comment', fields: { TEXT: comment } }];
+      }
+      return [];
+    }
 
     var list = [];
     var rest = raw;
