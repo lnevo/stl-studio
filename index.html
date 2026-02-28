@@ -289,7 +289,7 @@
       <p>Paste your STL program below (one statement per line). Supported: CLR, SET, A/O/AN/ON/LD Ix.x, =/S/R Qx.x, label:, JC/JCN/JU label, // comments.</p>
       <p class="import-error" id="importError" style="display:none;"></p>
       <button type="button" id="importLoadSample" class="sample-btn">Load sample (from debugger)</button>
-      <textarea id="importStlText" placeholder="CLR&#10;SET&#10;JU E1&#10;= Q0.0&#10;E1:&#10;CLR"></textarea>
+      <textarea id="importStlText" placeholder="Paste STL, config.NODEID….txt backup, group_logic.csv, or R1 AND (R2 OR R3)"></textarea>
       <div class="modal-actions">
         <button type="button" id="importCancel">Cancel</button>
         <button type="button" id="importApply" class="primary">Import into workspace</button>
@@ -397,7 +397,7 @@
         trashcan: true
       });
       if (Blockly.Tooltip && typeof Blockly.Tooltip.HOVER_MS !== 'undefined') {
-        Blockly.Tooltip.HOVER_MS = 250;
+        Blockly.Tooltip.HOVER_MS = 20;
       }
 
       function applyToolboxDarkText() {
@@ -532,23 +532,24 @@
         URL.revokeObjectURL(a.href);
       };
 
-      function escapeCsvField(s) {
-        if (s == null) return '';
-        s = String(s);
-        if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
-          return '"' + s.replace(/"/g, '""') + '"';
-        }
-        return s;
+      /** Quote a CSV field for JMRI: always wrap in quotes, escape internal " as "". */
+      function quoteCsvField(s) {
+        if (s == null) return '""';
+        return '"' + String(s).replace(/"/g, '""') + '"';
       }
 
       function stlToJmriCsv(stlReadable) {
         if (!stlReadable || stlReadable.indexOf('// No blocks') === 0) return null;
         var lines = stlReadable.split('\n');
-        var rows = [['Label', 'Operator', 'Name', 'Comment']];
+        var header = ['Group Name', 'Label', 'Operator', 'Name', 'Comment'];
+        var rows = [header];
         var opList = ['CLR', 'SET', 'A', 'O', 'AN', 'ON', 'NOT', '=', 'S', 'R', 'L', 'SD', 'FR', 'JC', 'JCN', 'JU'];
+        var rowNum = 0;
         for (var i = 0; i < lines.length; i++) {
           var line = lines[i].trim();
           if (!line) continue;
+          rowNum++;
+          var groupName = String(rowNum);
           var label = '';
           var comment = '';
           var commentIdx = line.indexOf('//');
@@ -557,7 +558,7 @@
             line = line.slice(0, commentIdx).trim();
           }
           if (!line && comment) {
-            rows.push(['', '', '', comment]);
+            rows.push([groupName, '', '', '', comment]);
             continue;
           }
           if (!line) continue;
@@ -577,9 +578,9 @@
               name = line;
             }
           }
-          rows.push([label, op, name, comment]);
+          rows.push([groupName, label, op, name, comment]);
         }
-        return rows.map(function (r) { return r.map(escapeCsvField).join(','); }).join('\r\n');
+        return rows.map(function (r) { return r.map(quoteCsvField).join(','); }).join('\r\n');
       }
 
       document.getElementById('btnDownloadCsv').onclick = function () {
@@ -590,7 +591,7 @@
         var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'stl-program.csv';
+        a.download = 'group_logic.csv';
         a.click();
         URL.revokeObjectURL(a.href);
       };
@@ -624,12 +625,248 @@
         if (e.target === importModal) closeImportModal();
       };
 
+      /** Detect Tower LCC+Q config backup (config.NODEID-....txt): contains Conditionals.Logic(.MultiLine */
+      function isConfigBackup(text) {
+        var t = (text || '').trim();
+        return t.length > 100 && /Conditionals\.Logic\(\d+\)\.MultiLine=/m.test(t);
+      }
+
+      /** Decode hex escapes in config MultiLine value: \x003d -> =, \x000a -> newline. */
+      function decodeConfigStl(s) {
+        if (!s) return '';
+        return s.replace(/\\x([0-9A-Fa-f]{2})/g, function (_, hex) {
+          return String.fromCharCode(parseInt(hex, 16));
+        });
+      }
+
+      /** Extract STL from Tower LCC+Q config backup (Conditionals.Logic(n).MultiLine=...). Returns STL string. */
+      function configBackupToStl(text) {
+        var lines = (text || '').split(/\r?\n/);
+        var stlParts = [];
+        var multiLineRe = /^Conditionals\.Logic\((\d+)\)\.MultiLine=(.*)$/;
+        var groupDescRe = /^Conditionals\.Logic\((\d+)\)\.Group Description=(.*)$/;
+        var groupNames = {};
+        for (var i = 0; i < lines.length; i++) {
+          var m = groupDescRe.exec(lines[i]);
+          if (m) groupNames[m[1]] = (m[2] || '').trim();
+        }
+        for (var j = 0; j < lines.length; j++) {
+          var ml = multiLineRe.exec(lines[j]);
+          if (!ml) continue;
+          var groupNum = ml[1];
+          var raw = ml[2] || '';
+          var decoded = decodeConfigStl(raw);
+          var stl = decoded.trim();
+          if (!stl) continue;
+          var name = groupNames[groupNum];
+          if (name) stlParts.push('// Group ' + groupNum + ': ' + name + '\n' + stl);
+          else stlParts.push('// Group ' + groupNum + '\n' + stl);
+        }
+        return stlParts.join('\n\n');
+      }
+
+      /** Detect JMRI/Tower LCC+Q backup CSV (group_logic.csv): header has Group Name, Operator. */
+      function isGroupLogicCsv(text) {
+        var t = (text || '').trim();
+        if (!t) return false;
+        var first = t.split(/[\r\n]+/)[0] || '';
+        return /Group Name/i.test(first) && /Operator/i.test(first);
+      }
+
+      /** Parse one line of CSV (quoted fields, "" = empty). Returns array of field strings. */
+      function parseCsvLine(line) {
+        var out = [];
+        var i = 0;
+        while (i < line.length) {
+          if (line[i] === '"') {
+            i++;
+            var val = '';
+            while (i < line.length) {
+              if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2; }
+              else if (line[i] === '"') { i++; break; }
+              else { val += line[i]; i++; }
+            }
+            out.push(val);
+          } else {
+            var end = line.indexOf(',', i);
+            if (end < 0) end = line.length;
+            out.push(line.slice(i, end).trim());
+            i = end + 1;
+          }
+        }
+        return out;
+      }
+
+      /** Convert group_logic.csv (JMRI/Tower LCC+Q backup) to STL text. */
+      function groupLogicCsvToStl(text) {
+        var lines = (text || '').split(/[\r\n]+/).map(function (l) { return l.trim(); }).filter(Boolean);
+        if (lines.length < 2) return null;
+        var header = parseCsvLine(lines[0]);
+        var groupIdx = header.findIndex(function (h) { return /Group Name/i.test(h); });
+        var labelIdx = header.findIndex(function (h) { return /Label/i.test(h); });
+        var opIdx = header.findIndex(function (h) { return /Operator/i.test(h); });
+        var nameIdx = header.findIndex(function (h) { return /Name/i.test(h); });
+        var commentIdx = header.findIndex(function (h) { return /Comment/i.test(h); });
+        if (opIdx < 0) return null;
+        var opList = ['CLR', 'SET', 'A', 'O', 'AN', 'ON', 'NOT', '=', 'S', 'R', 'L', 'SD', 'FR', 'JC', 'JCN', 'JU'];
+        var stlLines = [];
+        for (var i = 1; i < lines.length; i++) {
+          var fields = parseCsvLine(lines[i]);
+          var groupName = groupIdx >= 0 ? (fields[groupIdx] || '').trim() : '';
+          var label = labelIdx >= 0 ? (fields[labelIdx] || '').trim() : '';
+          var op = (fields[opIdx] || '').trim().toUpperCase();
+          var name = nameIdx >= 0 ? (fields[nameIdx] || '').trim() : '';
+          var comment = commentIdx >= 0 ? (fields[commentIdx] || '').trim() : '';
+          if (fields.length <= 2 && fields[0] && opList.indexOf((fields[0] || '').trim().toUpperCase()) >= 0) op = (fields[0] || '').trim().toUpperCase();
+          if (fields.length <= 2 && fields[1] && !name && (fields[1] || '').trim()) name = (fields[1] || '').trim();
+          if (!op && !label && !comment) continue;
+          var line = '';
+          if (label) line += label + (label.indexOf(':') >= 0 ? ' ' : ': ');
+          if (op) line += op + (name ? ' ' + name : '');
+          if (comment) line += (line ? ' // ' : '// ') + comment;
+          if (line) stlLines.push(line.trim());
+        }
+        return stlLines.length ? stlLines.join('\n') : null;
+      }
+
+      /** Detect logic expression format: R1 AND (R2 OR R3) with Rn, AND, OR, parens. */
+      function isLogicExpression(text) {
+        var t = (text || '').trim();
+        if (!t || t.length > 10000) return false;
+        return /R\d+\s*(AND|OR)|(AND|OR)\s*(\(|R\d)/i.test(t) && /^(R\d+|\s|AND|OR|\(|\))+$/i.test(t.replace(/\s+/g, ' '));
+      }
+
+      /** Map R1..R22 etc to I0.0, I0.1, ... (Tower LCC input style). */
+      function rNameToVar(name) {
+        var m = /^R(\d+)$/i.exec((name || '').trim());
+        if (!m) return null;
+        var n = parseInt(m[1], 10);
+        if (n < 1) return null;
+        var byte = Math.floor((n - 1) / 8);
+        var bit = (n - 1) % 8;
+        if (byte > 15) return null;
+        return 'I' + byte + '.' + bit;
+      }
+
+      /** Parse logic expression into STL. Returns STL string or null on error. */
+      function logicExpressionToStl(text) {
+        var s = (text || '').trim().replace(/\s+/g, ' ');
+        var tokens = [];
+        var i = 0;
+        while (i < s.length) {
+          if (s[i] === '(') { tokens.push({ type: 'LP' }); i++; }
+          else if (s[i] === ')') { tokens.push({ type: 'RP' }); i++; }
+          else if (s.substr(i, 3).toUpperCase() === 'AND') { tokens.push({ type: 'AND' }); i += 3; }
+          else if (s.substr(i, 2).toUpperCase() === 'OR') { tokens.push({ type: 'OR' }); i += 2; }
+          else if (/^R\d+/i.test(s.slice(i))) {
+            var match = s.slice(i).match(/^(R\d+)/i);
+            tokens.push({ type: 'ID', name: match[1].toUpperCase() });
+            i += match[1].length;
+          } else if (/\s/.test(s[i])) i++;
+          else return null;
+        }
+        var pos = 0;
+        function peek() { return pos < tokens.length ? tokens[pos] : null; }
+        function consume() { return pos < tokens.length ? tokens[pos++] : null; }
+        function parseExpr() {
+          var left = parseTerm();
+          if (!left) return null;
+          var ors = [];
+          while (peek() && peek().type === 'OR') {
+            consume();
+            var right = parseTerm();
+            if (!right) return null;
+            ors.push(right);
+          }
+          if (ors.length === 0) return left;
+          return { type: 'OR', left: left, right: ors.length === 1 ? ors[0] : { type: 'OR', left: ors[0], right: ors.length === 2 ? ors[1] : ors.slice(1).reduce(function (a, b) { return { type: 'OR', left: a, right: b }; }) } };
+        }
+        function parseTerm() {
+          var left = parseFactor();
+          if (!left) return null;
+          var ands = [left];
+          while (peek() && peek().type === 'AND') {
+            consume();
+            var right = parseFactor();
+            if (!right) return null;
+            ands.push(right);
+          }
+          return ands.length === 1 ? ands[0] : { type: 'AND', terms: ands };
+        }
+        function parseFactor() {
+          if (peek() && peek().type === 'LP') {
+            consume();
+            var e = parseExpr();
+            if (!e || !peek() || peek().type !== 'RP') return null;
+            consume();
+            return e;
+          }
+          if (peek() && peek().type === 'ID') {
+            var id = consume();
+            var v = rNameToVar(id.name);
+            if (!v) return null;
+            return { type: 'ID', var: v };
+          }
+          return null;
+        }
+        var ast = parseExpr();
+        if (!ast || pos !== tokens.length) return null;
+        var stlLines = [];
+        var nextTemp = 0;
+        function emitNode(n) {
+          if (n.type === 'ID') { stlLines.push('A ' + n.var); return; }
+          if (n.type === 'AND') {
+            for (var t = 0; t < n.terms.length; t++) {
+              if (n.terms[t].type === 'ID') stlLines.push('A ' + n.terms[t].var);
+              else emitNode(n.terms[t]);
+            }
+            return;
+          }
+          if (n.type === 'OR') {
+            emitNode(n.left);
+            var temp = 'M' + Math.floor(nextTemp / 8) + '.' + (nextTemp % 8);
+            nextTemp++;
+            stlLines.push('= ' + temp);
+            emitNode(n.right);
+            stlLines.push('O ' + temp);
+          }
+        }
+        emitNode(ast);
+        stlLines.push('= Q0.0');
+        return stlLines.join('\n');
+      }
+
       document.getElementById('importApply').onclick = function () {
         var text = importText.value;
         if (!window.stlImporter) {
           importError.textContent = 'Importer not loaded.';
           importError.style.display = 'block';
           return;
+        }
+        if (isConfigBackup(text)) {
+          var stl = configBackupToStl(text);
+          if (stl) text = stl;
+          else {
+            importError.textContent = 'Could not extract STL from config backup.';
+            importError.style.display = 'block';
+            return;
+          }
+        } else if (isGroupLogicCsv(text)) {
+          var stl = groupLogicCsvToStl(text);
+          if (stl) text = stl;
+          else {
+            importError.textContent = 'Could not parse backup CSV. Expected Group Name, Label, Operator, Name, Comment.';
+            importError.style.display = 'block';
+            return;
+          }
+        } else if (isLogicExpression(text)) {
+          var stl = logicExpressionToStl(text);
+          if (stl) text = stl;
+          else {
+            importError.textContent = 'Could not parse logic expression. Check AND/OR and R1, R2, ... names.';
+            importError.style.display = 'block';
+            return;
+          }
         }
         var result = window.stlImporter.importStl(text);
         if (!result.success) {
