@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
+  <script>var APP_VERSION = '1.0';</script>
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
     :root {
@@ -244,7 +245,7 @@
 <body>
   <header>
     <div>
-      <h1>STL Studio</h1>
+      <h1>STL Studio <span id="appVersion"></span></h1>
       <p>Build logic for Tower LCC+Q; copy the generated STL into your node via Configure Nodes.</p>
     </div>
     <div class="header-github">
@@ -332,6 +333,12 @@
   <script src="stl-importer.js"></script>
   <script>
     (function () {
+      (function setVersion() {
+        var v = window.APP_VERSION || '1.0';
+        document.title = 'STL Studio ' + v;
+        var el = document.getElementById('appVersion');
+        if (el) el.textContent = v;
+      })();
       var toolbox = {
         kind: 'categoryToolbox',
         contents: [
