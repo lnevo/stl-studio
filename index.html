@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.5';</script>
+  <script>var APP_VERSION = '1.6';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -392,7 +392,7 @@
   <script>
     (function () {
       (function setVersion() {
-        var v = window.APP_VERSION || '1.5';
+        var v = window.APP_VERSION || '1.6';
         document.title = 'STL Studio ' + v;
         var el = document.getElementById('appVersion');
         if (el) el.textContent = v;
@@ -507,11 +507,37 @@
       var stlExpandedPane = document.getElementById('stlExpandedPane');
       var lastCode = '';
       var BYTES_PER_GROUP = 255;
+      var TOTAL_BYTES_LIMIT = 255 * 16;
 
       function getByteCount(str) {
         if (!str) return 0;
         if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(str).length;
         return str.length;
+      }
+
+      /** Split STL by group headers; return array of byte counts per group. */
+      function getPerGroupByteCounts(formatted) {
+        if (!formatted || !formatted.trim()) return [];
+        var segments = formatted.split(/(?=\/\/ Group \d+:)/);
+        if (segments.length === 1) return [getByteCount(segments[0].trim())];
+        var out = [];
+        for (var i = 1; i < segments.length; i++) out.push(getByteCount(segments[i]));
+        return out;
+      }
+
+      /** Get stl_group blocks in workspace order (same order as codegen). */
+      function getOrderedGroupBlocks(workspace) {
+        if (!workspace || !workspace.getTopBlocks) return [];
+        var list = [];
+        var tops = workspace.getTopBlocks(false);
+        for (var i = 0; i < tops.length; i++) {
+          var b = tops[i];
+          while (b) {
+            if (b.type === 'stl_group') list.push(b);
+            b = b.getNextBlock();
+          }
+        }
+        return list;
       }
 
       function updateByteCount() {
@@ -520,15 +546,43 @@
         if (!formatted || formatted.indexOf('// No blocks') === 0) {
           stlByteCountEl.textContent = '';
           stlByteCountEl.classList.remove('warning');
+          if (typeof Blockly !== 'undefined' && ws) {
+            var groupBlocks = getOrderedGroupBlocks(ws);
+            for (var g = 0; g < groupBlocks.length; g++) {
+              if (groupBlocks[g].getField('GROUP_BYTES')) groupBlocks[g].setFieldValue('— bytes', 'GROUP_BYTES');
+            }
+          }
           return;
         }
-        var bytes = getByteCount(formatted);
-        stlByteCountEl.textContent = bytes + ' bytes (of ' + BYTES_PER_GROUP + ' per group)';
-        if (bytes > BYTES_PER_GROUP) {
+        var totalBytes = getByteCount(formatted);
+        var perGroup = getPerGroupByteCounts(formatted);
+        var overGroup = false;
+        for (var j = 0; j < perGroup.length; j++) {
+          if (perGroup[j] > BYTES_PER_GROUP) overGroup = true;
+        }
+        var overTotal = totalBytes > TOTAL_BYTES_LIMIT;
+        stlByteCountEl.textContent = totalBytes + ' / ' + TOTAL_BYTES_LIMIT + ' bytes';
+        if (perGroup.length > 0) {
+          var parts = [];
+          for (var k = 0; k < perGroup.length; k++) parts.push('Group ' + k + ': ' + perGroup[k]);
+          stlByteCountEl.textContent += ' (' + parts.join(', ') + ')';
+        }
+        if (overGroup || overTotal) {
           stlByteCountEl.classList.add('warning');
-          stlByteCountEl.textContent += ' — over limit; may be truncated when stored';
+          stlByteCountEl.textContent += ' — over limit';
         } else {
           stlByteCountEl.classList.remove('warning');
+        }
+        if (typeof Blockly !== 'undefined' && ws) {
+          var groupBlocks = getOrderedGroupBlocks(ws);
+          for (var g = 0; g < groupBlocks.length; g++) {
+            var f = groupBlocks[g].getField('GROUP_BYTES');
+            if (f && perGroup[g] !== undefined) {
+              var txt = perGroup[g] + ' bytes';
+              if (perGroup[g] > BYTES_PER_GROUP) txt += ' — over 255';
+              groupBlocks[g].setFieldValue(txt, 'GROUP_BYTES');
+            }
+          }
         }
       }
 
@@ -586,8 +640,8 @@
           return names[varName] ? '  — ' + varName + ' – ' + names[varName] : '';
         }
         if (!raw && comment) {
-          if (/^Group \d+:/.test(comment)) return '[Group] Group Description: ' + comment.replace(/^Group \d+:\s*/, '');
-          return '[//] Note (comment): ' + comment;
+          if (/^Group \d+:/.test(comment)) return '[// Group] Group Description: ' + comment.replace(/^Group \d+:\s*/, '');
+          return '[//] Comment: ' + comment;
         }
         if (!raw) return '';
         var parts = raw.split(/\s+/);
@@ -597,10 +651,10 @@
           case 'CLR': return '[CLR] Clear the current result (start fresh)';
           case 'SET': return '[SET] Set the current result to ON';
           case 'A':
-            if (arg === '(') return '[A(] AND group start ( … )';
+            if (arg === '(') return '[A(] AND nest start ( … )';
             return '[A] Check that ' + arg + ' is ON (AND)' + friendly(arg);
           case 'O':
-            if (arg === '(') return '[O(] OR group start ( … )';
+            if (arg === '(') return '[O(] OR nest start ( … )';
             return '[O] Check that ' + arg + ' is ON (OR)' + friendly(arg);
           case 'AN': return '[AN] Check that ' + arg + ' is OFF (AND NOT)' + friendly(arg);
           case 'ON': return '[ON] Check that ' + arg + ' is OFF (OR NOT)' + friendly(arg);
@@ -608,7 +662,7 @@
           case '=': return '[=] Set ' + arg + ' to result (ON or OFF)' + friendly(arg);
           case 'S': return '[S] Turn ON (latch) ' + arg + friendly(arg);
           case 'R': return '[R] Turn OFF or reset ' + arg + friendly(arg);
-          case ')': return '[)] Group end';
+          case ')': return '[)] Nest end';
           case 'JC': return '[JC] If result is ON, jump to ' + (arg || '?');
           case 'JCN': return '[JCN] If result is OFF, jump to ' + (arg || '?');
           case 'JU': return '[JU] Jump to ' + (arg || '?') + ' (always)';
@@ -618,7 +672,7 @@
           default:
             if (/^[A-Za-z0-9]{1,4}:$/.test(op)) return '[label:] Label (jump target): ' + op.slice(0, -1);
             if (raw.slice(-1) === ':' && /^[A-Za-z0-9]{1,4}:$/.test(raw.trim())) return '[label:] Label (jump target): ' + raw.trim().slice(0, -1);
-            if (comment) return '[//] Note (comment): ' + comment;
+            if (comment) return '[//] Comment: ' + comment;
             return raw;
         }
       }
@@ -973,10 +1027,11 @@
         }
       }
 
-      /** Decode hex escapes in config MultiLine value: \x003d -> =, \x000a -> newline. */
+      /** Decode hex escapes in config MultiLine value: \x003d -> =, \x000a -> newline (4-digit). */
       function decodeConfigStl(s) {
         if (!s) return '';
-        return s.replace(/\\x([0-9A-Fa-f]{2})/g, function (_, hex) {
+        return s.replace(/\\x([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})?/g, function (_, hex1, hex2) {
+          var hex = hex2 ? hex1 + hex2 : hex1;
           return String.fromCharCode(parseInt(hex, 16));
         });
       }

@@ -246,7 +246,7 @@
     },
     {
       type: 'stl_comment',
-      message0: '[//] Note (comment): %1',
+      message0: '[//] Comment %1',
       args0: [
         { type: 'field_input', name: 'TEXT', text: '', maxLength: 40 },
       ],
@@ -257,38 +257,40 @@
     },
     {
       type: 'stl_or_group_start',
-      message0: '[O(] OR group start ( … )',
+      message0: '[O(] OR nest start ( … )',
       previousStatement: null,
       nextStatement: null,
       colour: 180,
-      tooltip: 'STL: O(. Start of OR group. Inserted by import when parsing nested OR groups.',
+      tooltip: 'STL: O(. Start of OR nest. Inserted by import when parsing nested OR.',
     },
     {
       type: 'stl_and_group_start',
-      message0: '[A(] AND group start ( … )',
+      message0: '[A(] AND nest start ( … )',
       previousStatement: null,
       nextStatement: null,
       colour: 180,
-      tooltip: 'STL: A(. Start of AND group. Inserted by import when parsing nested AND groups.',
+      tooltip: 'STL: A(. Start of AND nest. Inserted by import when parsing nested AND.',
     },
     {
       type: 'stl_group_end',
-      message0: '[)] Group end',
+      message0: '[)] Nest end',
       previousStatement: null,
       nextStatement: null,
       colour: 180,
-      tooltip: 'STL: ). End of O( … ) or A( … ) group.',
+      tooltip: 'STL: ). End of O( … ) or A( … ) nest.',
     },
     {
       type: 'stl_group',
-      message0: '[Group] Group Description %1',
+      message0: '[// Group] Group Description %1',
       args0: [
         { type: 'field_input', name: 'NAME', text: '', maxLength: 60 },
       ],
+      message1: '  %1',
+      args1: [{ type: 'field_label', name: 'GROUP_BYTES', text: '— bytes' }],
       previousStatement: null,
       nextStatement: null,
       colour: 200,
-      tooltip: 'Tower LCC+Q: Conditionals.Logic(n).Group Description. Name for this logic group. Place before the blocks that belong to it. Exported in config backup and CSV (as "Group N: name"). Empty becomes "Default".',
+      tooltip: 'Tower LCC+Q: Conditionals.Logic(n).Group Description. Name for this logic group. Byte count (per group, max 255) is shown below. Place before the blocks that belong to it. Empty becomes "Default".',
     },
   ]);
 

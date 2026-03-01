@@ -95,8 +95,9 @@
     }
     if (!raw) {
       if (comment) {
-        var groupMatch = /^Group\s+(\d+):\s*(.*)$/.exec(comment);
-        if (groupMatch) return { type: 'stl_group', fields: { NAME: (groupMatch[2] || '').trim() || 'Default' } };
+        var c = comment.trim();
+        var groupMatch = /^Group\s*(\d+)\s*(?::\s*(.*))?/.exec(c);
+        if (groupMatch) return { type: 'stl_group', fields: { NAME: (groupMatch[2] != null ? groupMatch[2].trim() : '') || 'Default' } };
         return { type: 'stl_comment', fields: { TEXT: comment } };
       }
       return null;
@@ -172,6 +173,17 @@
    */
   function parseLineCompact(line) {
     var raw = line.trim();
+    // Comment-only line (e.g. // Group N: name): handle first so all groups become stl_group
+    if (raw.indexOf('//') === 0) {
+      var commentText = raw.slice(2).trim();
+      if (commentText) {
+        var c = commentText.trim();
+        var groupMatch = /^Group\s*(\d+)\s*(?::\s*(.*))?/.exec(c);
+        if (groupMatch) return [{ type: 'stl_group', fields: { NAME: (groupMatch[2] != null ? groupMatch[2].trim() : '') || 'Default' } }];
+        return [{ type: 'stl_comment', fields: { TEXT: commentText } }];
+      }
+      return [];
+    }
     var commentIdx = raw.indexOf('//');
     var comment = '';
     if (commentIdx >= 0) {
@@ -180,8 +192,9 @@
     }
     if (!raw) {
       if (comment) {
-        var groupMatch = /^Group\s+(\d+):\s*(.*)$/.exec(comment);
-        if (groupMatch) return [{ type: 'stl_group', fields: { NAME: (groupMatch[2] || '').trim() || 'Default' } }];
+        var c = comment.trim();
+        var groupMatch = /^Group\s*(\d+)\s*(?::\s*(.*))?/.exec(c);
+        if (groupMatch) return [{ type: 'stl_group', fields: { NAME: (groupMatch[2] != null ? groupMatch[2].trim() : '') || 'Default' } }];
         return [{ type: 'stl_comment', fields: { TEXT: comment } }];
       }
       return [];
@@ -358,7 +371,7 @@
    */
   function parseStlText(text) {
     var list = [];
-    var lines = (text || '').split(/\n/);
+    var lines = (text || '').split(/\r?\n/);
     for (var i = 0; i < lines.length; i++) {
       var parsedList = parseLineCompact(lines[i]);
       for (var j = 0; j < parsedList.length; j++) list.push(parsedList[j]);
