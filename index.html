@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.14';</script>
+  <script>var APP_VERSION = '1.15';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -153,13 +153,51 @@
       width: 14px;
       margin-left: -4px;
     }
-    #stlPanel h2 {
+    .stl-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      gap: 0.5rem;
       margin: 0;
       padding: 0.75rem 1rem;
-      font-size: 0.9rem;
-      font-weight: 600;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+    }
+    .stl-panel-header h2 {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+    }
+    .stl-copy-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel-bg);
+      color: var(--text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .stl-copy-btn:hover {
+      background: var(--border);
+      color: var(--accent);
+    }
+    .stl-copy-btn.copy-success {
+      background: var(--accent) !important;
+      border-color: var(--accent);
+      color: #fff !important;
+    }
+    .header-actions button.copy-success {
+      background: var(--accent) !important;
+      border-color: var(--accent);
+      color: #fff !important;
     }
     .stl-format-row {
       flex-shrink: 0;
@@ -325,8 +363,45 @@
       justify-content: flex-end;
     }
     .modal .import-error { color: #f87171; font-size: 0.8rem; margin: 0 1rem 0.5rem; }
-    .modal .sample-btn { margin: 0 1rem 0.5rem; font-size: 0.8rem; }
+    .import-file-zone {
+      margin: 0 1rem 0.5rem;
+      padding: 0.75rem 1rem;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      background: var(--panel-bg);
+      text-align: center;
+      cursor: pointer;
+    }
+    .import-file-zone:hover,
+    .import-file-zone.drag-over { border-color: var(--accent); background: var(--surface); }
+    .import-file-zone-text { margin: 0; font-size: 0.9rem; color: var(--muted); }
+    .import-choose-file-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: inherit;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .import-choose-file-btn:hover { color: var(--text); }
     .csv-download-options { display: flex; flex-direction: column; gap: 0.5rem; margin: 0 1rem 1rem; }
+    .download-filename-row {
+      display: flex; align-items: center; gap: 0.5rem; margin: 0 1rem 0.5rem;
+      font-size: 0.9rem;
+    }
+    .download-filename-row label { color: var(--muted); flex-shrink: 0; }
+    .download-filename-row input {
+      flex: 1; min-width: 0; font-family: inherit; font-size: 0.9rem;
+      padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg); color: var(--text);
+    }
+    .download-section-sep {
+      margin: 1rem 1rem 0.5rem; border-top: 1px solid var(--border);
+    }
+    .download-section-label {
+      margin: 0 1rem 0.35rem; font-size: 0.8rem; font-weight: 600; color: var(--muted);
+    }
     .csv-opt-btn { display: block; text-align: left; padding: 0.5rem 0.75rem; cursor: pointer; background: var(--panel-bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.9rem; }
     .csv-opt-btn:hover:not(:disabled) { background: var(--surface); border-color: var(--accent); }
     .csv-opt-btn:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -362,13 +437,12 @@
       </div>
     </div>
     <div class="header-actions">
-      <button type="button" id="btnCopy" class="primary">Copy to clipboard</button>
-      <button type="button" id="btnDownload">Download STL</button>
-      <button type="button" id="btnDownloadCsv">Download CSV</button>
-      <button type="button" id="btnDownloadConfigBackup" title="Download updated backup (logic only)" style="display: none;">Download backup</button>
-      <button type="button" id="btnImport">Import STL…</button>
+      <button type="button" id="btnImport" class="primary">Import STL</button>
       <button type="button" id="btnExample">Load example</button>
       <button type="button" id="btnClear" title="Remove all blocks from the workspace">Clear all blocks</button>
+      <button type="button" id="btnDownload">Download</button>
+      <button type="button" id="btnShare" title="Copy a link that restores this workspace">Share</button>
+      <button type="button" id="btnCopyStlToolbar" title="Copy STL to clipboard">Copy STL</button>
       <button type="button" id="btnLogicStringHelp" title="How the blocks work together">How do the blocks work?</button>
       <button type="button" id="btnInputsRef" title="Quick help and reference">Help</button>
     </div>
@@ -377,7 +451,15 @@
     <div id="blocklyDiv"></div>
     <div id="stlPanelResizer" class="stl-panel-resizer" role="separator" aria-label="Drag to resize Generated STL column"></div>
     <aside id="stlPanel">
-      <h2>Generated STL</h2>
+      <div class="stl-panel-header">
+        <h2>Generated STL</h2>
+        <button type="button" id="btnCopyStl" class="stl-copy-btn" title="Copy STL to clipboard" aria-label="Copy STL to clipboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button type="button" id="btnShareStl" class="stl-copy-btn" title="Copy share link" aria-label="Copy share link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+        </button>
+      </div>
       <div class="stl-format-row">
         <label for="stlFormat">Output format:</label>
         <select id="stlFormat" aria-label="STL output format">
@@ -408,8 +490,17 @@
 
   <div id="csvDownloadModal" class="modal-overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-labelledby="csvDownloadModalTitle">
-      <h3 id="csvDownloadModalTitle">Download CSV</h3>
+      <h3 id="csvDownloadModalTitle">Download</h3>
       <p>Choose a file to download. Other options appear when the relevant data is loaded (e.g. from a config backup or friendly names).</p>
+      <div class="csv-download-options" role="group" aria-label="Text / STL">
+        <button type="button" id="csvOptStl" class="csv-opt-btn" title="Generated STL program">STL program (.txt)</button>
+      </div>
+      <div class="download-filename-row">
+        <label for="downloadFileName">File name (for STL)</label>
+        <input type="text" id="downloadFileName" value="stl-program.txt" placeholder="stl-program.txt" aria-label="File name for STL download">
+      </div>
+      <div class="download-section-sep" aria-hidden="true"></div>
+      <p class="download-section-label">CSV files</p>
       <div class="csv-download-options" role="group" aria-label="CSV download options">
         <button type="button" id="csvOptGroupLogic" class="csv-opt-btn">group_logic.csv</button>
         <button type="button" id="csvOptInputs" class="csv-opt-btn" title="Inputs data (from config backup or friendly names)" style="display: none;">inputs.csv</button>
@@ -417,6 +508,12 @@
         <button type="button" id="csvOptTransmitters" class="csv-opt-btn" title="Transmitters data (from config backup or friendly names)" style="display: none;">transmitters.csv</button>
         <button type="button" id="csvOptReceivers" class="csv-opt-btn" title="Receivers data (from config backup or friendly names)" style="display: none;">receivers.csv</button>
         <button type="button" id="csvOptZip" class="csv-opt-btn csv-opt-zip" title="All JMRI CSVs as ZIP" style="display: none;">All as ZIP</button>
+      </div>
+      <p class="csv-zip-note" style="margin-top:0.5rem;font-size:0.8rem;color:var(--muted);">ZIP includes group_logic.csv (if you have logic) and all four JMRI CSVs. Empty files include headers only so JMRI can import the set.</p>
+      <div class="download-section-sep" aria-hidden="true"></div>
+      <p class="download-section-label">Q+ backup</p>
+      <div class="csv-download-options" role="group" aria-label="Config backup">
+        <button type="button" id="csvOptBackup" class="csv-opt-btn" title="Updated Tower config with logic only (import a backup first)" style="display: none;">Config backup (.txt)</button>
       </div>
       <div class="modal-actions">
         <button type="button" id="csvDownloadCancel">Cancel</button>
@@ -429,7 +526,10 @@
       <h3 id="importModalTitle">Import STL code</h3>
       <p>Paste your STL program below (one statement per line). Supported: CLR, SET, A/O/AN/ON/LD Ix.x, =/S/R Qx.x, label:, JC/JCN/JU label, // comments.</p>
       <p class="import-error" id="importError" style="display:none;"></p>
-      <button type="button" id="importLoadSample" class="sample-btn">Load sample (from debugger)</button>
+      <div id="importFileZone" class="import-file-zone" aria-label="Drop a file or choose file to import">
+        <p class="import-file-zone-text">Drop a file here or <button type="button" id="importChooseFile" class="import-choose-file-btn">choose a file</button></p>
+        <input type="file" id="importFileInput" accept=".txt,.csv,text/*" style="display:none" aria-label="Select file to import">
+      </div>
       <textarea id="importStlText" placeholder="Paste STL, config.NODEID….txt backup, group_logic.csv, or R1 AND (R2 OR R3)"></textarea>
       <div class="modal-actions">
         <button type="button" id="importCancel">Cancel</button>
@@ -443,9 +543,9 @@
       <h3 id="helpRefModalTitle">Help</h3>
       <div class="modal-body-text">
         <p><strong>STL Studio</strong> builds logic programs for the Tower LCC+Q. Drag blocks from the left into the workspace; the generated code updates as you edit.</p>
-        <p>Use <strong>Copy to clipboard</strong> to copy the STL, then paste it into your node (e.g. via <strong>Configure Nodes</strong> in your layout software). Use <strong>Download STL</strong> to save a file, or <strong>Import STL…</strong> to load existing code or a Tower config backup.</p>
+        <p>Use <strong>Copy to clipboard</strong> to copy the STL, then paste it into your node (e.g. via <strong>Configure Nodes</strong> in your layout software). Use <strong>Download</strong> to save the STL or CSV files (you can choose the file name for STL), or <strong>Import STL</strong> to load existing code or a Tower config backup.</p>
         <p>Inputs are I0.0–I15.7, outputs Q0.0–Q15.7. Labels: 1–4 characters plus a colon (e.g. E1:). Importing a Tower config backup fills block dropdowns with <strong>friendly names</strong> (sensor/output descriptions) when available.</p>
-        <p>After importing a config backup, <strong>Download backup</strong> saves a full config file with only the <strong>Conditionals</strong> (logic groups and STL) updated; <strong>NODE ID</strong>, <strong>Port I/O</strong>, <strong>Logic Inputs/Outputs</strong>, <strong>Track Transmitters/Receivers</strong>, and <strong>Syntax Messages</strong> are left unchanged from the imported file.</p>
+        <p>After importing a config backup, use <strong>Download</strong> and choose <strong>Config backup (.txt)</strong> to save a full config file with only the <strong>Conditionals</strong> (logic groups and STL) updated; <strong>NODE ID</strong>, <strong>Port I/O</strong>, <strong>Logic Inputs/Outputs</strong>, <strong>Track Transmitters/Receivers</strong>, and <strong>Syntax Messages</strong> are left unchanged from the imported file.</p>
         <p><a href="https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml" target="_blank" rel="noopener">JMRI STL Editor</a> (syntax reference)</p>
       </div>
       <div class="modal-actions">
@@ -484,6 +584,7 @@
     body .blocklyFlyoutLabelText { fill: #1a1d23 !important; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
   <script>
     (function () {
       var TOOLTIP_HOVER_MS = 250;
@@ -1109,6 +1210,19 @@
             document.addEventListener('mouseup', stop);
           });
         }
+        var btnCopyStl = document.getElementById('btnCopyStl');
+        if (btnCopyStl) {
+          btnCopyStl.addEventListener('click', function () {
+            var text = (stlSplitView && stlSplitView.checked && stlRawPane)
+              ? stlRawPane.textContent
+              : (stlOutput ? stlOutput.textContent : '');
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function () {
+              btnCopyStl.classList.add('copy-success');
+              setTimeout(function () { btnCopyStl.classList.remove('copy-success'); }, 1500);
+            });
+          });
+        }
         refreshStlDisplay();
 
       var changeTimeout;
@@ -1119,30 +1233,6 @@
       });
       refreshJmriFromWorkspace(ws);
 
-      document.getElementById('btnCopy').onclick = function () {
-        updateStl();
-        var toCopy = getFormattedStl();
-        if (!toCopy) return;
-        navigator.clipboard.writeText(toCopy).then(
-          function () { refreshStlDisplay('// Copied to clipboard.\n\n' + toCopy); },
-          function () { refreshStlDisplay('// Copy failed.\n\n' + toCopy); }
-        );
-      };
-
-      document.getElementById('btnDownload').onclick = function () {
-        updateStl();
-        var content = getFormattedStl();
-        if (!content || content.indexOf('// No blocks') === 0) {
-          showMessageModal('Download STL', 'There is no STL to download. Add blocks from the toolbox to the workspace first.');
-          return;
-        }
-        var blob = new Blob([content], { type: 'text/plain' });
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'stl-program.txt';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      };
 
       /** JMRI-style CSV: quote only when value contains comma, newline, or "; empty first column = "". */
       function needQuote(s) {
@@ -1244,6 +1334,78 @@
         return false;
       }
 
+      /** Build compact share payload: stl + names/event IDs only (no workspace XML). */
+      function buildSharePayload() {
+        refreshJmriFromWorkspace(ws);
+        var stl = getFormattedStl();
+        if (!stl || stl.indexOf('// No blocks') === 0) return null;
+        function definedInput(r) { return (r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim()); }
+        function definedTxRx(r) { return (r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()); }
+        var inputs = (window.stlJmriInputs || []).filter(definedInput);
+        var outputs = (window.stlJmriOutputs || []).filter(definedInput);
+        var tx = (window.stlJmriTransmitters || []).filter(definedTxRx);
+        var rx = (window.stlJmriReceivers || []).filter(definedTxRx);
+        var fn = {};
+        if (window.stlFriendlyNames && typeof window.stlFriendlyNames === 'object') {
+          for (var k in window.stlFriendlyNames) { if (window.stlFriendlyNames[k]) fn[k] = window.stlFriendlyNames[k]; }
+        }
+        var payload = { stl: stl };
+        if (Object.keys(fn).length) payload.fn = fn;
+        if (inputs.length) payload.i = inputs;
+        if (outputs.length) payload.o = outputs;
+        if (tx.length) payload.t = tx;
+        if (rx.length) payload.r = rx;
+        return payload;
+      }
+
+      /** Same as buildSharePayload but with event ID fields stripped (names only), for a smaller share link. */
+      function buildSharePayloadNamesOnly() {
+        var full = buildSharePayload();
+        if (!full) return null;
+        var payload = { stl: full.stl };
+        if (full.fn && Object.keys(full.fn).length) payload.fn = full.fn;
+        if (full.i && full.i.length) payload.i = full.i.map(function (r) { return [r[0], r[1] || '', '', '']; });
+        if (full.o && full.o.length) payload.o = full.o.map(function (r) { return [r[0], r[1] || '', '', '']; });
+        if (full.t && full.t.length) payload.t = full.t.map(function (r) { return [r[0], r[1] || '', '']; });
+        if (full.r && full.r.length) payload.r = full.r.map(function (r) { return [r[0], r[1] || '', '']; });
+        return payload;
+      }
+
+      /** Apply share payload: merge names/event IDs into full grids, set window, add variable blocks. Call after loading STL XML into workspace. */
+      function applySharePayload(payload) {
+        if (!payload) return;
+        window.stlFriendlyNames = payload.fn || {};
+        function defaultIo(prefix) {
+          var out = [];
+          for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
+            out.push([prefix + g + '.' + b, '', '', '']);
+          }
+          return out;
+        }
+        function defaultTxRx(prefix) {
+          var out = [];
+          for (var n = 0; n < 16; n++) out.push([prefix + n, '', '']);
+          return out;
+        }
+        function mergeIo(defaultRows, sparse) {
+          if (!sparse || !sparse.length) return defaultRows;
+          var byKey = {};
+          for (var i = 0; i < sparse.length; i++) byKey[sparse[i][0]] = sparse[i].slice();
+          var out = [];
+          for (var j = 0; j < defaultRows.length; j++) {
+            var k = defaultRows[j][0];
+            out.push(byKey[k] || defaultRows[j].slice());
+          }
+          return out;
+        }
+        window.stlJmriInputs = mergeIo(defaultIo('I'), payload.i);
+        window.stlJmriOutputs = mergeIo(defaultIo('Q'), payload.o);
+        window.stlJmriTransmitters = mergeIo(defaultTxRx('Z'), payload.t);
+        window.stlJmriReceivers = mergeIo(defaultTxRx('Y'), payload.r);
+        if (payload.i || payload.o || payload.t || payload.r) addVariableBlocksFromBackup(ws);
+        if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length && window.getStlLogicVarOptions) refreshBlockVarOptions(ws);
+      }
+
       var messageModal = document.getElementById('messageModal');
       var messageModalTitle = document.getElementById('messageModalTitle');
       var messageModalBody = document.getElementById('messageModalBody');
@@ -1291,7 +1453,8 @@
       };
 
       var csvDownloadModal = document.getElementById('csvDownloadModal');
-      function openCsvDownloadModal() {
+      var downloadFileNameInput = document.getElementById('downloadFileName');
+      function openDownloadModal() {
         updateStl();
         refreshJmriFromWorkspace(ws);
         var hasStl = getFormattedStl() && getFormattedStl().indexOf('// No blocks') !== 0;
@@ -1299,22 +1462,28 @@
         var outputsDefined = hasDefinedJmriRows(window.stlJmriOutputs, 'output');
         var txDefined = hasDefinedJmriRows(window.stlJmriTransmitters, 'tx');
         var rxDefined = hasDefinedJmriRows(window.stlJmriReceivers, 'rx');
-        if (!hasStl && !inputsDefined && !outputsDefined && !txDefined && !rxDefined) {
-          showMessageModal('Download CSV', 'There are no CSV files to download. Add logic blocks and/or variable blocks (with names or event IDs) to enable CSV export.');
+        var hasBackup = !!window.stlConfigBackupRaw;
+        if (!hasStl && !inputsDefined && !outputsDefined && !txDefined && !rxDefined && !hasBackup) {
+          showMessageModal('Download', 'There is nothing to download. Add blocks from the toolbox or load data (e.g. from a config backup) to enable export.');
           return;
         }
+        var stlOpt = document.getElementById('csvOptStl');
         var g = document.getElementById('csvOptGroupLogic');
         var i = document.getElementById('csvOptInputs');
         var o = document.getElementById('csvOptOutputs');
         var t = document.getElementById('csvOptTransmitters');
         var r = document.getElementById('csvOptReceivers');
         var z = document.getElementById('csvOptZip');
+        var backupOpt = document.getElementById('csvOptBackup');
+        if (stlOpt) stlOpt.style.display = hasStl ? '' : 'none';
         if (g) g.style.display = hasStl ? '' : 'none';
         if (i) i.style.display = inputsDefined ? '' : 'none';
         if (o) o.style.display = outputsDefined ? '' : 'none';
         if (t) t.style.display = txDefined ? '' : 'none';
         if (r) r.style.display = rxDefined ? '' : 'none';
-        if (z) z.style.display = (inputsDefined || outputsDefined || txDefined || rxDefined) ? '' : 'none';
+        if (z) z.style.display = (hasStl || inputsDefined || outputsDefined || txDefined || rxDefined) ? '' : 'none';
+        if (backupOpt) backupOpt.style.display = hasBackup ? '' : 'none';
+        if (downloadFileNameInput) downloadFileNameInput.value = downloadFileNameInput.value.trim() || 'stl-program.txt';
         csvDownloadModal.classList.add('visible');
         csvDownloadModal.setAttribute('aria-hidden', 'false');
       }
@@ -1331,10 +1500,265 @@
         a.click();
         URL.revokeObjectURL(a.href);
       }
-      document.getElementById('btnDownloadCsv').onclick = openCsvDownloadModal;
+      document.getElementById('btnDownload').onclick = openDownloadModal;
+      var SHARE_URL_MAX = 8000;
+      function compressStr(s) {
+        return typeof LZString !== 'undefined' && LZString.compressToEncodedURIComponent
+          ? LZString.compressToEncodedURIComponent(s)
+          : encodeURIComponent(s);
+      }
+      function performShare(feedbackEl) {
+        updateStl();
+        var payload = buildSharePayload();
+        if (!payload) {
+          if (feedbackEl) {
+            var orig = feedbackEl.getAttribute('title');
+            feedbackEl.setAttribute('title', 'Workspace is empty');
+            setTimeout(function () { feedbackEl.setAttribute('title', orig || 'Copy share link'); }, 2000);
+          }
+          return;
+        }
+        var base = location.origin + location.pathname;
+        var fullEncoded = compressStr(JSON.stringify(payload));
+        var namesPayload = buildSharePayloadNamesOnly();
+        var namesEncoded = namesPayload ? compressStr(JSON.stringify(namesPayload)) : '';
+        var stl = getFormattedStl();
+        var stlEncoded = (stl && stl.indexOf('// No blocks') !== 0) ? compressStr(stl) : '';
+        var fullFits = fullEncoded.length <= SHARE_URL_MAX;
+        var namesFits = namesEncoded.length > 0 && namesEncoded.length <= SHARE_URL_MAX;
+        var stlFits = stlEncoded.length > 0 && stlEncoded.length <= SHARE_URL_MAX;
+
+        if (!fullFits && !namesFits && stlFits) {
+          var stlUrl = base + '?stl=' + stlEncoded;
+          navigator.clipboard.writeText(stlUrl).then(function () {
+            if (feedbackEl) {
+              var orig = feedbackEl.getAttribute('title');
+              feedbackEl.setAttribute('title', 'Link copied!');
+              setTimeout(function () { feedbackEl.setAttribute('title', orig || 'Copy share link'); }, 1500);
+            }
+          }, function () {
+            if (feedbackEl) {
+              feedbackEl.setAttribute('title', 'Copy failed');
+              setTimeout(function () { feedbackEl.setAttribute('title', 'Copy share link'); }, 2000);
+            }
+          });
+          return;
+        }
+        if (!fullFits && !namesFits && !stlFits) {
+          messageModalTitle.textContent = 'Share';
+          messageModalBody.textContent = 'STL is also too large (' + ((stlEncoded.length / 1024).toFixed(1)) + ' KB). Use Download to save as a file and share that instead.';
+          messageModalActions.innerHTML = '';
+          var okBtn = document.createElement('button');
+          okBtn.type = 'button';
+          okBtn.className = 'primary';
+          okBtn.textContent = 'OK';
+          okBtn.onclick = closeMessageModal;
+          messageModalActions.appendChild(okBtn);
+          messageModal.classList.add('visible');
+          messageModal.setAttribute('aria-hidden', 'false');
+          return;
+        }
+
+        messageModalTitle.textContent = 'Share';
+        var limitKb = (SHARE_URL_MAX / 1024).toFixed(1);
+        if (fullFits) {
+          messageModalBody.textContent = 'Choose what to include in the link (limit ~' + limitKb + ' KB).';
+        } else {
+          messageModalBody.textContent = 'Full payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Choose an option below.';
+        }
+        messageModalActions.innerHTML = '';
+
+        function addFullBtn() {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'primary';
+          btn.textContent = 'Copy link (logic + names + event IDs)';
+          btn.onclick = function () {
+            var url = base + '?d=' + fullEncoded;
+            navigator.clipboard.writeText(url).then(function () {
+              btn.textContent = 'Copied!';
+              setTimeout(function () { btn.textContent = 'Copy link (logic + names + event IDs)'; }, 1500);
+            });
+          };
+          messageModalActions.appendChild(btn);
+        }
+        function addNamesOnlyBtn() {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = fullFits ? '' : 'primary';
+          btn.textContent = 'Copy link with names (no event IDs)';
+          btn.onclick = function () {
+            var url = base + '?d=' + namesEncoded;
+            navigator.clipboard.writeText(url).then(function () {
+              btn.textContent = 'Copied!';
+              setTimeout(function () { btn.textContent = 'Copy link with names (no event IDs)'; }, 1500);
+            });
+          };
+          messageModalActions.appendChild(btn);
+        }
+        function addStlOnlyBtn() {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = 'Copy link with STL only';
+          btn.onclick = function () {
+            var url = base + '?stl=' + stlEncoded;
+            navigator.clipboard.writeText(url).then(function () {
+              btn.textContent = 'Copied!';
+              setTimeout(function () { btn.textContent = 'Copy link with STL only'; }, 1500);
+            });
+          };
+          messageModalActions.appendChild(btn);
+        }
+        if (fullFits) {
+          addFullBtn();
+          addNamesOnlyBtn();
+          addStlOnlyBtn();
+        } else if (namesFits) {
+          addNamesOnlyBtn();
+          addStlOnlyBtn();
+        }
+        var okBtn = document.createElement('button');
+        okBtn.type = 'button';
+        okBtn.textContent = 'OK';
+        okBtn.onclick = closeMessageModal;
+        messageModalActions.appendChild(okBtn);
+        messageModal.classList.add('visible');
+        messageModal.setAttribute('aria-hidden', 'false');
+      }
+      document.getElementById('btnShare').onclick = function () { performShare(document.getElementById('btnShare')); };
+      var btnShareStl = document.getElementById('btnShareStl');
+      if (btnShareStl) btnShareStl.addEventListener('click', function () { performShare(btnShareStl); });
+      document.getElementById('btnCopyStlToolbar').onclick = function () {
+        updateStl();
+        var text = (stlSplitView && stlSplitView.checked && stlRawPane)
+          ? stlRawPane.textContent
+          : (stlOutput ? stlOutput.textContent : '');
+        if (!text) return;
+        var btn = document.getElementById('btnCopyStlToolbar');
+        navigator.clipboard.writeText(text).then(function () {
+          btn.textContent = 'Copied!';
+          btn.classList.add('copy-success');
+          setTimeout(function () {
+            btn.textContent = 'Copy STL';
+            btn.classList.remove('copy-success');
+          }, 1500);
+        });
+      };
+
+      function loadStateFromUrl(workspace) {
+        if (!workspace || !location.search) return;
+        var dMatch = /[?&]d=([^&]+)/.exec(location.search);
+        if (dMatch && dMatch[1]) {
+          var dEncoded = dMatch[1];
+          var jsonStr = null;
+          if (typeof LZString !== 'undefined' && LZString.decompressFromEncodedURIComponent) {
+            jsonStr = LZString.decompressFromEncodedURIComponent(dEncoded);
+          }
+          if (!jsonStr) {
+            try { jsonStr = decodeURIComponent(dEncoded); } catch (e) {}
+          }
+          if (jsonStr && window.stlImporter) {
+            try {
+              var payload = JSON.parse(jsonStr);
+              var stl = payload && payload.stl;
+              if (stl) {
+                var result = window.stlImporter.importStl(stl);
+                if (result && result.success) {
+                  var dom = xmlTextToDom(result.xml);
+                  workspace.clear();
+                  Blockly.Xml.domToWorkspace(dom, workspace);
+                  applySharePayload(payload);
+                  connectImportedStack(workspace);
+                  updateStl();
+                  var params = new URLSearchParams(location.search);
+                  params.delete('d');
+                  var q = params.toString();
+                  var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
+                  history.replaceState({}, '', clean);
+                }
+              }
+            } catch (e) {}
+          }
+          return;
+        }
+        var stlMatch = /[?&]stl=([^&]+)/.exec(location.search);
+        if (stlMatch && stlMatch[1]) {
+          var stlEncoded = stlMatch[1];
+          var stlStr = null;
+          if (typeof LZString !== 'undefined' && LZString.decompressFromEncodedURIComponent) {
+            stlStr = LZString.decompressFromEncodedURIComponent(stlEncoded);
+          }
+          if (!stlStr) {
+            try {
+              stlStr = decodeURIComponent(stlEncoded);
+            } catch (e) {}
+          }
+          if (stlStr && window.stlImporter) {
+            try {
+              var result = window.stlImporter.importStl(stlStr);
+              if (result && result.success) {
+                var dom = xmlTextToDom(result.xml);
+                workspace.clear();
+                Blockly.Xml.domToWorkspace(dom, workspace);
+                connectImportedStack(workspace);
+                updateStl();
+                var params = new URLSearchParams(location.search);
+                params.delete('stl');
+                var q = params.toString();
+                var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
+                history.replaceState({}, '', clean);
+              }
+            } catch (e) {}
+          }
+          return;
+        }
+        var match = /[?&]s=([^&]+)/.exec(location.search);
+        if (!match || !match[1]) return;
+        var encoded = match[1];
+        var xmlStr = null;
+        if (typeof LZString !== 'undefined' && LZString.decompressFromEncodedURIComponent) {
+          xmlStr = LZString.decompressFromEncodedURIComponent(encoded);
+        }
+        if (!xmlStr) {
+          try {
+            xmlStr = decodeURIComponent(escape(atob(decodeURIComponent(encoded))));
+          } catch (e) { return; }
+        }
+        if (!xmlStr || !xmlStr.trim()) return;
+        try {
+          var dom = xmlTextToDom(xmlStr);
+          workspace.clear();
+          Blockly.Xml.domToWorkspace(dom, workspace);
+          connectImportedStack(workspace);
+          updateStl();
+          var params = new URLSearchParams(location.search);
+          params.delete('s');
+          var q = params.toString();
+          var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
+          history.replaceState({}, '', clean);
+        } catch (e) {}
+      }
       document.getElementById('csvDownloadCancel').onclick = closeCsvDownloadModal;
       csvDownloadModal.onclick = function (e) {
         if (e.target === csvDownloadModal) closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptStl').onclick = function () {
+        updateStl();
+        var content = getFormattedStl();
+        if (!content || content.indexOf('// No blocks') === 0) {
+          showMessageModal('Download STL', 'There is no STL to download. Add blocks from the toolbox first.');
+          return;
+        }
+        var raw = (downloadFileNameInput && downloadFileNameInput.value.trim()) || 'stl-program.txt';
+        var name = raw.replace(/[\\/:*?"<>|]/g, '').trim() || 'stl-program';
+        if (!/\.txt$/i.test(name)) name += '.txt';
+        var blob = new Blob([content], { type: 'text/plain' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        closeCsvDownloadModal();
       };
       document.getElementById('csvOptGroupLogic').onclick = function () {
         updateStl();
@@ -1371,19 +1795,22 @@
         if (typeof JSZip === 'undefined') return;
         updateStl();
         refreshJmriFromWorkspace(ws);
-        var inputsDefined = hasDefinedJmriRows(window.stlJmriInputs, 'input');
-        var outputsDefined = hasDefinedJmriRows(window.stlJmriOutputs, 'output');
-        var txDefined = hasDefinedJmriRows(window.stlJmriTransmitters, 'tx');
-        var rxDefined = hasDefinedJmriRows(window.stlJmriReceivers, 'rx');
-        if (!inputsDefined && !outputsDefined && !txDefined && !rxDefined) return;
         var readable = formatStl(lastCode, 'readable');
         var hasStl = readable && readable.indexOf('// No blocks') !== 0;
         var zip = new JSZip();
-        if (hasStl) zip.file('group_logic.csv', stlToJmriCsv(readable, window.stlFriendlyNames) || '');
-        if (inputsDefined && window.stlJmriInputs) zip.file('inputs.csv', jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs));
-        if (outputsDefined && window.stlJmriOutputs) zip.file('outputs.csv', jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs));
-        if (txDefined && window.stlJmriTransmitters) zip.file('transmitters.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters));
-        if (rxDefined && window.stlJmriReceivers) zip.file('receivers.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers));
+        if (hasStl) {
+          zip.file('group_logic.csv', stlToJmriCsv(readable, window.stlFriendlyNames) || '');
+        } else {
+          zip.file('group_logic.csv', 'Group Name,Label,Operator,Name,Comment\r\n');
+        }
+        var inputsRows = (window.stlJmriInputs && hasDefinedJmriRows(window.stlJmriInputs, 'input')) ? window.stlJmriInputs : [];
+        var outputsRows = (window.stlJmriOutputs && hasDefinedJmriRows(window.stlJmriOutputs, 'output')) ? window.stlJmriOutputs : [];
+        var txRows = (window.stlJmriTransmitters && hasDefinedJmriRows(window.stlJmriTransmitters, 'tx')) ? window.stlJmriTransmitters : [];
+        var rxRows = (window.stlJmriReceivers && hasDefinedJmriRows(window.stlJmriReceivers, 'rx')) ? window.stlJmriReceivers : [];
+        zip.file('inputs.csv', jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], inputsRows));
+        zip.file('outputs.csv', jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], outputsRows));
+        zip.file('transmitters.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], txRows));
+        zip.file('receivers.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], rxRows));
         zip.generateAsync({ type: 'blob' }).then(function (content) {
           var a = document.createElement('a');
           a.href = URL.createObjectURL(content);
@@ -1394,17 +1821,9 @@
         closeCsvDownloadModal();
       };
 
-      /* To support Download backup without an imported backup we would need:
-       * 1. A full config template: emit every key in order (NODE ID, Port I/O lines 0-7 with
-       *    Delays, Commands/Consumers, Actions/Producers, Logic Inputs I0.0-I15.7, Logic Outputs
-       *    Q0.0-Q15.7, Track Transmitters Z0-Z15, Track Receivers Y0-Y15, Conditionals, Syntax Messages).
-       * 2. Default/empty values for all keys (e.g. empty descriptions, 0 for numeric fields).
-       * 3. Event IDs (True/False, Link Address, Syntax Events) are node-specific; without import
-       *    we cannot generate valid LCC event IDs—would leave empty or placeholder.
-       */
-      document.getElementById('btnDownloadConfigBackup').onclick = function () {
+      document.getElementById('csvOptBackup').onclick = function () {
         if (!window.stlConfigBackupRaw) {
-          alert('Import a Tower config backup first. Then you can edit logic here and download an updated config file.');
+          showMessageModal('Download backup', 'Import a Tower config backup first. Then you can edit logic here and download an updated config file.');
           return;
         }
         updateStl();
@@ -1418,26 +1837,68 @@
         a.download = 'config-export.txt';
         a.click();
         URL.revokeObjectURL(a.href);
+        closeCsvDownloadModal();
       };
 
       var importModal = document.getElementById('importModal');
       var importText = document.getElementById('importStlText');
       var importError = document.getElementById('importError');
 
-      var debuggerSampleStl = '// Tower signal routing\n// Q0.0 = (I0.0 AND I0.1) OR (I0.2 AND NOT I0.3)\nLD I0.0\nA I0.1\nO(\nLD I0.2\nAN I0.3\n)\n= Q0.0\n// If lamp on, jump to skip; else set Q0.1 (C-shaped: JC + body + label)\nJC Skip\nA I0.0\n= Q0.1\nSkip: CLR\n// Indicator lamp\nLD Q0.0\n= Q0.1';
-
       document.getElementById('btnImport').onclick = function () {
         importError.style.display = 'none';
         importText.value = '';
+        document.getElementById('importFileInput').value = '';
         importModal.classList.add('visible');
         importModal.setAttribute('aria-hidden', 'false');
         importText.focus();
       };
 
-      document.getElementById('importLoadSample').onclick = function () {
-        importText.value = debuggerSampleStl;
-        importError.style.display = 'none';
-      };
+      function setImportTextFromFile(file) {
+        if (!file || !importText) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          importText.value = reader.result;
+          importError.style.display = 'none';
+        };
+        reader.onerror = function () {
+          importError.textContent = 'Could not read file.';
+          importError.style.display = 'block';
+        };
+        reader.readAsText(file, 'UTF-8');
+      }
+
+      var importFileZone = document.getElementById('importFileZone');
+      var importFileInput = document.getElementById('importFileInput');
+      var importChooseFile = document.getElementById('importChooseFile');
+      if (importChooseFile && importFileInput) {
+        importChooseFile.onclick = function (e) { e.preventDefault(); e.stopPropagation(); importFileInput.click(); };
+      }
+      if (importFileZone && importFileInput) {
+        importFileZone.onclick = function (e) {
+          if (e.target.id !== 'importChooseFile') importFileInput.click();
+        };
+        importFileZone.ondragover = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          importFileZone.classList.add('drag-over');
+        };
+        importFileZone.ondragleave = function () {
+          importFileZone.classList.remove('drag-over');
+        };
+        importFileZone.ondrop = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          importFileZone.classList.remove('drag-over');
+          var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) setImportTextFromFile(file);
+        };
+      }
+      if (importFileInput) {
+        importFileInput.onchange = function () {
+          var file = importFileInput.files && importFileInput.files[0];
+          if (file) setImportTextFromFile(file);
+        };
+      }
 
       function closeImportModal() {
         importModal.classList.remove('visible');
@@ -2026,17 +2487,6 @@
           window.stlJmriTransmitters = null;
           window.stlJmriReceivers = null;
         }
-        var configBackupBtn = document.getElementById('btnDownloadConfigBackup');
-        if (configBackupBtn) {
-          if (window.stlConfigBackupRaw) {
-            configBackupBtn.style.display = '';
-            configBackupBtn.disabled = false;
-            configBackupBtn.title = 'Download updated backup (logic only)';
-          } else {
-            configBackupBtn.style.display = 'none';
-            configBackupBtn.disabled = true;
-          }
-        }
         if (isGroupLogicCsv(text)) {
           var stl = groupLogicCsvToStl(text);
           if (stl) text = stl;
@@ -2147,11 +2597,6 @@
           window.stlJmriTransmitters = null;
           window.stlJmriReceivers = null;
           window.stlFriendlyNames = {};
-          var configBackupBtn = document.getElementById('btnDownloadConfigBackup');
-          if (configBackupBtn) {
-            configBackupBtn.style.display = 'none';
-            configBackupBtn.disabled = true;
-          }
           refreshJmriFromWorkspace(ws);
           if (window.refreshBlockVarOptions) refreshBlockVarOptions(ws);
           updateStl();
@@ -2192,9 +2637,11 @@
           .replace(/'/g, '&apos;');
       }
 
-      /** Create variable blocks from backup JMRI data and place them in a stack to the right of the code. No-op if no config backup. */
+      /** Create variable blocks from backup JMRI data and place them in a stack to the right of the code. Runs when config backup is loaded or when JMRI data (names/event IDs) is present (e.g. from a share URL). */
       function addVariableBlocksFromBackup(workspace) {
-        if (!window.stlConfigBackupRaw) return;
+        var hasBackup = !!window.stlConfigBackupRaw;
+        var hasJmriData = hasDefinedJmriRows(window.stlJmriInputs, 'input') || hasDefinedJmriRows(window.stlJmriOutputs, 'output') || hasDefinedJmriRows(window.stlJmriTransmitters, 'tx') || hasDefinedJmriRows(window.stlJmriReceivers, 'rx');
+        if (!hasBackup && !hasJmriData) return;
         var inputs = window.stlJmriInputs || [];
         var outputs = window.stlJmriOutputs || [];
         var tx = window.stlJmriTransmitters || [];
@@ -2398,6 +2845,7 @@
         }
       }
 
+      loadStateFromUrl(ws);
       updateStl();
       }
       loadBlocklyThenInit();
