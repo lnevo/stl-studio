@@ -425,22 +425,21 @@
   /**
    * Build Blockly XML from a list of block descriptors (one stack).
    * Descriptors may have .body (array) for C-shaped jump blocks; then we emit <statement name="BODY">.
+   * Blocks are chained with <next> so generation order is guaranteed (e.g. label then CLR then = Q1.0).
    */
   var FLAT_BLOCK_SPACING = 50;
   function buildXml(list) {
     if (list.length === 0) return '';
     var merged = mergeJumpLabel(list);
-    var parts = [];
-    for (var i = 0; i < merged.length; i++) {
+    var nextXml = null;
+    for (var i = merged.length - 1; i >= 0; i--) {
       var item = merged[i];
       var stmtName = item.body !== undefined ? 'BODY' : null;
       var stmtList = item.body;
-      parts.push(blockXml(item.type, item.fields, null, stmtName, stmtList));
+      nextXml = blockXml(item.type, item.fields, nextXml, stmtName, stmtList);
     }
     var xml = '<xml xmlns="https://developers.google.com/blockly/xml">';
-    for (var j = 0; j < parts.length; j++) {
-      xml += parts[j].replace('x="0" y="0"', 'x="20" y="' + (j * FLAT_BLOCK_SPACING) + '"');
-    }
+    xml += nextXml.replace('x="0" y="0"', 'x="20" y="0"');
     xml += '</xml>';
     return xml;
   }
