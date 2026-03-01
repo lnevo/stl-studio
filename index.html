@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.12';</script>
+  <script>var APP_VERSION = '1.13';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -520,7 +520,7 @@
       }
       function initApp() {
       (function setVersion() {
-        var v = window.APP_VERSION || '1.12';
+        var v = window.APP_VERSION || '1.13';
         document.title = 'STL Studio ' + v;
         var el = document.getElementById('appVersion');
         if (el) el.textContent = v;
@@ -815,30 +815,61 @@
         }
       }
 
+      /** Compact one instruction line: no space between op and arg. Keep space for JC/JCN/JU label and for Label: rest (unless noSpaceAfterColon). */
+      function compactStlLine(t, noSpaceAfterColon) {
+        if (!t || t.indexOf('//') === 0) return t;
+        if (/^[A-Za-z0-9]{1,4}:\s*/.test(t)) {
+          var labelMatch = t.match(/^([A-Za-z0-9]{1,4}:)\s*(.*)$/);
+          if (labelMatch) return labelMatch[1] + (noSpaceAfterColon ? '' : ' ') + labelMatch[2].replace(/\s+/g, '');
+          return t;
+        }
+        if (/^(JC|JCN|JU)\s+\S+/.test(t)) return t.replace(/^(JC|JCN|JU)\s+(\S+)\s*$/, '$1 $2');
+        return t.replace(/\s+/g, '');
+      }
+
+      /** Build compressed/compact output: merge lines, breaking at config-style points (jumps, //; compact also breaks before labels). */
       function formatStl(raw, mode) {
         if (!raw || mode === 'readable') return raw;
         var lines = raw.split('\n');
-        if (mode === 'compact') {
-          return lines.map(function (line) {
-            var t = line.trim();
-            if (!t || t.indexOf('//') === 0) return line;
-            return t.replace(/^(\S+)\s+(.*)$/, '$1$2');
-          }).join('\n');
-        }
-        if (mode === 'compressed') {
-          var out = '';
-          for (var i = 0; i < lines.length; i++) {
-            var t = lines[i].trim();
-            if (!t) continue;
-            var compact;
-            if (t.indexOf('//') === 0) compact = t;
-            else if (/^[A-Za-z0-9]{1,4}:\s+\S+/.test(t)) compact = t;
-            else compact = t.replace(/^(\S+)\s+(.*)$/, '$1$2');
-            out += compact + '\n';
+        var noSpaceAfterColon = false;
+        var breakAfterJump = (mode === 'compressed');
+        var breakAfterComment = (mode === 'compressed');
+        var breakBeforeLabel = (mode === 'compact');
+        var out = '';
+        var buf = '';
+        for (var i = 0; i < lines.length; i++) {
+          var t = lines[i].trim();
+          if (t === '') {
+            if (buf) { out += buf + '\n'; buf = ''; }
+            if (mode === 'compressed') out += '\n';
+            continue;
           }
-          return out;
+          if (/^\/\/\s*Group\s+\d+/.test(t)) {
+            if (buf) { out += buf + '\n'; buf = ''; }
+            if (mode === 'compressed') out += '\n';
+            continue;
+          }
+          var c = compactStlLine(t, noSpaceAfterColon);
+          var isJump = /^(JC|JCN|JU)\s+\S+/.test(c);
+          var isLabel = /^[A-Za-z0-9]{1,4}:\s*.+/.test(c) || /^[A-Za-z0-9]{1,4}:$/.test(c);
+          var hasComment = c.indexOf('//') >= 0;
+          if (isLabel && breakBeforeLabel) {
+            if (buf) { out += buf + '\n'; buf = ''; }
+            buf = c;
+          } else if (isJump && breakAfterJump) {
+            buf = buf ? buf + c : c;
+            out += buf + '\n';
+            buf = '';
+          } else if (hasComment && breakAfterComment) {
+            buf = buf ? buf + c : c;
+            out += buf + '\n';
+            buf = '';
+          } else {
+            buf = buf ? buf + c : c;
+          }
         }
-        return raw;
+        if (buf) out += buf + '\n';
+        return out.replace(/\n+$/, '\n');
       }
 
       function getFormattedStl() {
