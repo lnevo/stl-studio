@@ -314,6 +314,11 @@
     }
     .modal .import-error { color: #f87171; font-size: 0.8rem; margin: 0 1rem 0.5rem; }
     .modal .sample-btn { margin: 0 1rem 0.5rem; font-size: 0.8rem; }
+    .csv-download-options { display: flex; flex-direction: column; gap: 0.5rem; margin: 0 1rem 1rem; }
+    .csv-opt-btn { display: block; text-align: left; padding: 0.5rem 0.75rem; cursor: pointer; background: var(--panel-bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.9rem; }
+    .csv-opt-btn:hover:not(:disabled) { background: var(--surface); border-color: var(--accent); }
+    .csv-opt-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .csv-opt-zip { margin-top: 0.25rem; font-weight: 600; }
     .logic-string-modal .modal-body-text {
       padding: 0 1rem;
       font-size: 0.85rem;
@@ -346,6 +351,7 @@
       <button type="button" id="btnCopy" class="primary">Copy to clipboard</button>
       <button type="button" id="btnDownload">Download STL</button>
       <button type="button" id="btnDownloadCsv">Download CSV</button>
+      <button type="button" id="btnDownloadConfigBackup" title="Download updated backup (logic only)" style="display: none;">Download backup</button>
       <button type="button" id="btnImport">Import STL…</button>
       <button type="button" id="btnExample">Load example</button>
       <button type="button" id="btnLogicStringHelp" title="How the blocks work together">How do the blocks work?</button>
@@ -377,6 +383,24 @@
     </aside>
   </main>
 
+  <div id="csvDownloadModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="csvDownloadModalTitle">
+      <h3 id="csvDownloadModalTitle">Download CSV</h3>
+      <p>Choose a file to download. Other options appear when the relevant data is loaded (e.g. from a config backup or friendly names).</p>
+      <div class="csv-download-options" role="group" aria-label="CSV download options">
+        <button type="button" id="csvOptGroupLogic" class="csv-opt-btn">group_logic.csv</button>
+        <button type="button" id="csvOptInputs" class="csv-opt-btn" title="Inputs data (from config backup or friendly names)" style="display: none;">inputs.csv</button>
+        <button type="button" id="csvOptOutputs" class="csv-opt-btn" title="Outputs data (from config backup or friendly names)" style="display: none;">outputs.csv</button>
+        <button type="button" id="csvOptTransmitters" class="csv-opt-btn" title="Transmitters data (from config backup or friendly names)" style="display: none;">transmitters.csv</button>
+        <button type="button" id="csvOptReceivers" class="csv-opt-btn" title="Receivers data (from config backup or friendly names)" style="display: none;">receivers.csv</button>
+        <button type="button" id="csvOptZip" class="csv-opt-btn csv-opt-zip" title="All JMRI CSVs as ZIP" style="display: none;">All as ZIP</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="csvDownloadCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="importModal" class="modal-overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-labelledby="importModalTitle">
       <h3 id="importModalTitle">Import STL code</h3>
@@ -398,6 +422,7 @@
         <p><strong>STL Studio</strong> builds logic programs for the Tower LCC+Q. Drag blocks from the left into the workspace; the generated code updates as you edit.</p>
         <p>Use <strong>Copy to clipboard</strong> to copy the STL, then paste it into your node (e.g. via <strong>Configure Nodes</strong> in your layout software). Use <strong>Download STL</strong> to save a file, or <strong>Import STL…</strong> to load existing code or a Tower config backup.</p>
         <p>Inputs are I0.0–I15.7, outputs Q0.0–Q15.7. Labels: 1–4 characters plus a colon (e.g. E1:). Importing a Tower config backup fills block dropdowns with <strong>friendly names</strong> (sensor/output descriptions) when available.</p>
+        <p>After importing a config backup, <strong>Download backup</strong> saves a full config file with only the <strong>Conditionals</strong> (logic groups and STL) updated; <strong>NODE ID</strong>, <strong>Port I/O</strong>, <strong>Logic Inputs/Outputs</strong>, <strong>Track Transmitters/Receivers</strong>, and <strong>Syntax Messages</strong> are left unchanged from the imported file.</p>
         <p><a href="https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml" target="_blank" rel="noopener">JMRI STL Editor</a> (syntax reference)</p>
       </div>
       <div class="modal-actions">
@@ -439,6 +464,7 @@
   <script src="stl-blocks.js"></script>
   <script src="stl-generator.js"></script>
   <script src="stl-importer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     (function () {
       (function setVersion() {
@@ -967,7 +993,7 @@
         return String(val);
       }
 
-      function stlToJmriCsv(stlReadable) {
+      function stlToJmriCsv(stlReadable, friendlyNames) {
         if (!stlReadable || stlReadable.indexOf('// No blocks') === 0) return null;
         var lines = stlReadable.split('\n');
         var header = ['Group Name', 'Label', 'Operator', 'Name', 'Comment'];
@@ -1008,7 +1034,8 @@
               name = line;
             }
           }
-          rows.push([groupName, label, op, name, comment]);
+          var displayName = (friendlyNames && name && friendlyNames[name]) ? friendlyNames[name] : name;
+          rows.push([groupName, label, op, displayName, comment]);
         }
         var out = [header.join(',')];
         var needGroupHeader = true;
@@ -1034,15 +1061,119 @@
         return out.join('\r\n');
       }
 
-      document.getElementById('btnDownloadCsv').onclick = function () {
-        updateStl();
-        var readable = formatStl(lastCode, 'readable');
-        var csv = stlToJmriCsv(readable);
-        if (!csv) return;
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      var csvDownloadModal = document.getElementById('csvDownloadModal');
+      function openCsvDownloadModal() {
+        var g = document.getElementById('csvOptGroupLogic');
+        var i = document.getElementById('csvOptInputs');
+        var o = document.getElementById('csvOptOutputs');
+        var t = document.getElementById('csvOptTransmitters');
+        var r = document.getElementById('csvOptReceivers');
+        var z = document.getElementById('csvOptZip');
+        if (g) g.style.display = ''; /* group_logic always available from workspace */
+        if (i) i.style.display = window.stlJmriInputs ? '' : 'none';
+        if (o) o.style.display = window.stlJmriOutputs ? '' : 'none';
+        if (t) t.style.display = window.stlJmriTransmitters ? '' : 'none';
+        if (r) r.style.display = window.stlJmriReceivers ? '' : 'none';
+        if (z) z.style.display = window.stlJmriInputs ? '' : 'none'; /* ZIP when we have JMRI set */
+        csvDownloadModal.classList.add('visible');
+        csvDownloadModal.setAttribute('aria-hidden', 'false');
+      }
+      function closeCsvDownloadModal() {
+        csvDownloadModal.classList.remove('visible');
+        csvDownloadModal.setAttribute('aria-hidden', 'true');
+      }
+      function downloadCsvFile(filename, content) {
+        if (!content) return;
+        var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'group_logic.csv';
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      document.getElementById('btnDownloadCsv').onclick = openCsvDownloadModal;
+      document.getElementById('csvDownloadCancel').onclick = closeCsvDownloadModal;
+      csvDownloadModal.onclick = function (e) {
+        if (e.target === csvDownloadModal) closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptGroupLogic').onclick = function () {
+        updateStl();
+        var readable = formatStl(lastCode, 'readable');
+        var csv = stlToJmriCsv(readable, window.stlFriendlyNames);
+        downloadCsvFile('group_logic.csv', csv);
+        closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptInputs').onclick = function () {
+        if (!window.stlJmriInputs) return;
+        var csv = jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs);
+        downloadCsvFile('inputs.csv', csv);
+        closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptOutputs').onclick = function () {
+        if (!window.stlJmriOutputs) return;
+        var csv = jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs);
+        downloadCsvFile('outputs.csv', csv);
+        closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptTransmitters').onclick = function () {
+        if (!window.stlJmriTransmitters) return;
+        var csv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters);
+        downloadCsvFile('transmitters.csv', csv);
+        closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptReceivers').onclick = function () {
+        if (!window.stlJmriReceivers) return;
+        var csv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers);
+        downloadCsvFile('receivers.csv', csv);
+        closeCsvDownloadModal();
+      };
+      document.getElementById('csvOptZip').onclick = function () {
+        if (!window.stlJmriInputs || typeof JSZip === 'undefined') return;
+        updateStl();
+        var readable = formatStl(lastCode, 'readable');
+        var groupLogicCsv = stlToJmriCsv(readable, window.stlFriendlyNames) || '';
+        var inputsCsv = jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs);
+        var outputsCsv = jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs);
+        var transmittersCsv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters);
+        var receiversCsv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers);
+        var zip = new JSZip();
+        zip.file('group_logic.csv', groupLogicCsv);
+        zip.file('inputs.csv', inputsCsv);
+        zip.file('outputs.csv', outputsCsv);
+        zip.file('transmitters.csv', transmittersCsv);
+        zip.file('receivers.csv', receiversCsv);
+        zip.generateAsync({ type: 'blob' }).then(function (content) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(content);
+          a.download = 'jmri_csv_set.zip';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+        closeCsvDownloadModal();
+      };
+
+      /* To support Download backup without an imported backup we would need:
+       * 1. A full config template: emit every key in order (NODE ID, Port I/O lines 0-7 with
+       *    Delays, Commands/Consumers, Actions/Producers, Logic Inputs I0.0-I15.7, Logic Outputs
+       *    Q0.0-Q15.7, Track Transmitters Z0-Z15, Track Receivers Y0-Y15, Conditionals, Syntax Messages).
+       * 2. Default/empty values for all keys (e.g. empty descriptions, 0 for numeric fields).
+       * 3. Event IDs (True/False, Link Address, Syntax Events) are node-specific; without import
+       *    we cannot generate valid LCC event IDs—would leave empty or placeholder.
+       */
+      document.getElementById('btnDownloadConfigBackup').onclick = function () {
+        if (!window.stlConfigBackupRaw) {
+          alert('Import a Tower config backup first. Then you can edit logic here and download an updated config file.');
+          return;
+        }
+        updateStl();
+        var readable = formatStl(lastCode, 'readable');
+        var groups = parseWorkspaceGroups(readable);
+        var list = [];
+        for (var i = 0; i <= 15; i++) if (groups[i]) list.push(groups[i]);
+        var configText = buildConfigBackupFromWorkspace(window.stlConfigBackupRaw, list);
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([configText], { type: 'text/plain;charset=utf-8' }));
+        a.download = 'config-export.txt';
         a.click();
         URL.revokeObjectURL(a.href);
       };
@@ -1051,7 +1182,7 @@
       var importText = document.getElementById('importStlText');
       var importError = document.getElementById('importError');
 
-      var debuggerSampleStl = '// Tower signal routing\n// Q0.0 = (I0.0 AND I0.1) OR\n// (I0.2 AND NOT I0.3)\nLD I0.0\nA I0.1\nO(\nLD I0.2\nAN I0.3\n)\n= Q0.0\n// Indicator lamp\nLD Q0.0\n= Q0.1';
+      var debuggerSampleStl = '// Tower signal routing\n// Q0.0 = (I0.0 AND I0.1) OR (I0.2 AND NOT I0.3)\nLD I0.0\nA I0.1\nO(\nLD I0.2\nAN I0.3\n)\n= Q0.0\n// If lamp on, jump to skip; else set Q0.1 (C-shaped: JC + body + label)\nJC Skip\nA I0.0\n= Q0.1\nSkip: CLR\n// Indicator lamp\nLD Q0.0\n= Q0.1';
 
       document.getElementById('btnImport').onclick = function () {
         importError.style.display = 'none';
@@ -1106,6 +1237,105 @@
         return map;
       }
 
+      /** Parse config backup for JMRI inputs.csv: Input, Name, True Event ID, False Event ID. */
+      function parseConfigJmriInputs(configText) {
+        var lines = (configText || '').split(/\r?\n/);
+        var byKey = {};
+        var inputRe = /^Logic Inputs\.Group I(\d+)\((\d+)\)\.(Input Description|True|False)=(.*)$/;
+        for (var i = 0; i < lines.length; i++) {
+          var m = inputRe.exec(lines[i]);
+          if (!m) continue;
+          var key = 'I' + m[1] + '.' + m[2];
+          if (!byKey[key]) byKey[key] = { input: key, name: '', trueId: '', falseId: '' };
+          if (m[3] === 'Input Description') byKey[key].name = (m[4] || '').trim();
+          else if (m[3] === 'True') byKey[key].trueId = (m[4] || '').trim();
+          else if (m[3] === 'False') byKey[key].falseId = (m[4] || '').trim();
+        }
+        var out = [];
+        for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
+          var k = 'I' + g + '.' + b;
+          var row = byKey[k] || { input: k, name: '', trueId: '', falseId: '' };
+          out.push([row.input, row.name, row.trueId, row.falseId]);
+        }
+        return out;
+      }
+
+      /** Parse config backup for JMRI outputs.csv: Output, Name, True Event ID, False Event ID. */
+      function parseConfigJmriOutputs(configText) {
+        var lines = (configText || '').split(/\r?\n/);
+        var byKey = {};
+        var outputRe = /^Logic Outputs\.Group Q(\d+)\((\d+)\)\.(Output Description|True|False)=(.*)$/;
+        for (var i = 0; i < lines.length; i++) {
+          var m = outputRe.exec(lines[i]);
+          if (!m) continue;
+          var key = 'Q' + m[1] + '.' + m[2];
+          if (!byKey[key]) byKey[key] = { output: key, name: '', trueId: '', falseId: '' };
+          if (m[3] === 'Output Description') byKey[key].name = (m[4] || '').trim();
+          else if (m[3] === 'True') byKey[key].trueId = (m[4] || '').trim();
+          else if (m[3] === 'False') byKey[key].falseId = (m[4] || '').trim();
+        }
+        var out = [];
+        for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
+          var k = 'Q' + g + '.' + b;
+          var row = byKey[k] || { output: k, name: '', trueId: '', falseId: '' };
+          out.push([row.output, row.name, row.trueId, row.falseId]);
+        }
+        return out;
+      }
+
+      /** Parse config backup for JMRI transmitters.csv: Circuit, Name, Event ID (Z0–Z15). */
+      function parseConfigJmriTransmitters(configText) {
+        var lines = (configText || '').split(/\r?\n/);
+        var byIdx = {};
+        var txRe = /^Track Transmitters\.Tx Circuit\((\d+)\)\.(Track Circuit Description|Link Address)=(.*)$/;
+        for (var i = 0; i < lines.length; i++) {
+          var m = txRe.exec(lines[i]);
+          if (!m) continue;
+          var idx = parseInt(m[1], 10);
+          if (idx < 0 || idx > 15) continue;
+          if (!byIdx[idx]) byIdx[idx] = { circuit: 'Z' + idx, name: '', eventId: '' };
+          if (m[2] === 'Track Circuit Description') byIdx[idx].name = (m[3] || '').trim();
+          else if (m[2] === 'Link Address') byIdx[idx].eventId = (m[3] || '').trim();
+        }
+        var out = [];
+        for (var n = 0; n < 16; n++) {
+          var row = byIdx[n] || { circuit: 'Z' + n, name: '', eventId: '' };
+          out.push([row.circuit, row.name, row.eventId]);
+        }
+        return out;
+      }
+
+      /** Parse config backup for JMRI receivers.csv: Circuit, Name, Event ID (Y0–Y15). */
+      function parseConfigJmriReceivers(configText) {
+        var lines = (configText || '').split(/\r?\n/);
+        var byIdx = {};
+        var rxRe = /^Track Receivers\.Rx Circuit\((\d+)\)\.(Remote Mast Description|Link Address)=(.*)$/;
+        for (var i = 0; i < lines.length; i++) {
+          var m = rxRe.exec(lines[i]);
+          if (!m) continue;
+          var idx = parseInt(m[1], 10);
+          if (idx < 0 || idx > 15) continue;
+          if (!byIdx[idx]) byIdx[idx] = { circuit: 'Y' + idx, name: '', eventId: '' };
+          if (m[2] === 'Remote Mast Description') byIdx[idx].name = (m[3] || '').trim();
+          else if (m[2] === 'Link Address') byIdx[idx].eventId = (m[3] || '').trim();
+        }
+        var out = [];
+        for (var n = 0; n < 16; n++) {
+          var row = byIdx[n] || { circuit: 'Y' + n, name: '', eventId: '' };
+          out.push([row.circuit, row.name, row.eventId]);
+        }
+        return out;
+      }
+
+      /** Build a single JMRI-style CSV from rows (array of arrays). */
+      function jmriCsvFromRows(header, rows) {
+        var out = [header.join(',')];
+        for (var i = 0; i < rows.length; i++) {
+          out.push(rows[i].map(function (v, idx) { return formatCsvCell(v, idx === 0); }).join(','));
+        }
+        return out.join('\r\n');
+      }
+
       /** After loading friendly names (config backup), refresh VAR dropdowns so blocks show "I0.0 – Description". */
       function refreshBlockVarOptions(workspace) {
         if (!workspace || !window.getStlLogicVarOptions) return;
@@ -1138,6 +1368,67 @@
           var hex = hex2 ? hex1 + hex2 : hex1;
           return String.fromCharCode(parseInt(hex, 16));
         });
+      }
+
+      /** Encode STL for config MultiLine: = -> \x003d, newline -> \x000a. */
+      function encodeConfigStl(s) {
+        if (!s) return '';
+        return String(s).replace(/=/g, '\\x003d').replace(/\n/g, '\\x000a').trim();
+      }
+
+      /**
+       * Parse workspace-generated readable code into per-group chunks.
+       * Returns array of { index, name, stl } for each "// Group N: name" section (N 0..15).
+       */
+      function parseWorkspaceGroups(readableCode) {
+        var groups = [];
+        var re = /\/\/ Group (\d+):\s*([^\n]*)\n([\s\S]*?)(?=\/\/ Group \d+:|$)/g;
+        var m;
+        while ((m = re.exec(readableCode)) !== null) {
+          var idx = parseInt(m[1], 10);
+          if (idx >= 0 && idx <= 15) {
+            groups[idx] = { index: idx, name: (m[2] || '').trim() || 'Default', stl: (m[3] || '').trim() };
+          }
+        }
+        return groups;
+      }
+
+      /**
+       * Build a full config backup by replacing only Conditionals.Logic(n).Group Description
+       * and Conditionals.Logic(n).MultiLine in the original raw config. All other sections
+       * are preserved from the imported file. Config details NOT modified (and only present
+       * if user imported a backup): NODE ID (Node Name, Node Description), Port I/O (Line
+       * descriptions, Commands/Consumers, Actions/Producers, Delays), Logic Inputs/Outputs
+       * (descriptions + True/False event IDs), Track Transmitters/Receivers (descriptions +
+       * Link Address), Syntax Messages (Build Successful / Syntax Error(s) event IDs, Message 1–3).
+       */
+      function buildConfigBackupFromWorkspace(rawConfigText, groupList) {
+        var lines = (rawConfigText || '').split(/\r?\n/);
+        var groupDescRe = /^Conditionals\.Logic\((\d+)\)\.Group Description=(.*)$/;
+        var multiLineRe = /^Conditionals\.Logic\((\d+)\)\.MultiLine=(.*)$/;
+        var byIndex = {};
+        for (var i = 0; i < (groupList || []).length; i++) {
+          var g = groupList[i];
+          if (g && g.index >= 0 && g.index <= 15) byIndex[g.index] = g;
+        }
+        var out = [];
+        for (var j = 0; j < lines.length; j++) {
+          var line = lines[j];
+          var md = groupDescRe.exec(line);
+          if (md) {
+            var g = byIndex[parseInt(md[1], 10)];
+            out.push('Conditionals.Logic(' + md[1] + ').Group Description=' + (g ? g.name : (md[2] || '')));
+            continue;
+          }
+          var mm = multiLineRe.exec(line);
+          if (mm) {
+            var g2 = byIndex[parseInt(mm[1], 10)];
+            out.push('Conditionals.Logic(' + mm[1] + ').MultiLine=' + (g2 ? encodeConfigStl(g2.stl) : (mm[2] || '')));
+            continue;
+          }
+          out.push(line);
+        }
+        return out.join('\n');
       }
 
       /** Extract STL from Tower LCC+Q config backup (Conditionals.Logic(n).MultiLine=...). Returns STL string. */
@@ -1356,7 +1647,12 @@
           return;
         }
         if (isConfigBackup(text)) {
+          window.stlConfigBackupRaw = rawPaste;
           window.stlFriendlyNames = parseConfigFriendlyNames(rawPaste);
+          window.stlJmriInputs = parseConfigJmriInputs(rawPaste);
+          window.stlJmriOutputs = parseConfigJmriOutputs(rawPaste);
+          window.stlJmriTransmitters = parseConfigJmriTransmitters(rawPaste);
+          window.stlJmriReceivers = parseConfigJmriReceivers(rawPaste);
           var stl = configBackupToStl(text);
           if (stl) text = stl;
           else {
@@ -1364,7 +1660,25 @@
             importError.style.display = 'block';
             return;
           }
-        } else if (isGroupLogicCsv(text)) {
+        } else {
+          window.stlConfigBackupRaw = null;
+          window.stlJmriInputs = null;
+          window.stlJmriOutputs = null;
+          window.stlJmriTransmitters = null;
+          window.stlJmriReceivers = null;
+        }
+        var configBackupBtn = document.getElementById('btnDownloadConfigBackup');
+        if (configBackupBtn) {
+          if (window.stlConfigBackupRaw) {
+            configBackupBtn.style.display = '';
+            configBackupBtn.disabled = false;
+            configBackupBtn.title = 'Download updated backup (logic only)';
+          } else {
+            configBackupBtn.style.display = 'none';
+            configBackupBtn.disabled = true;
+          }
+        }
+        if (isGroupLogicCsv(text)) {
           var stl = groupLogicCsvToStl(text);
           if (stl) text = stl;
           else {
