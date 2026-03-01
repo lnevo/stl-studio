@@ -43,8 +43,19 @@
     var v = block.getFieldValue('VAR') || 'I0.0';
     return withNext(block, gen, 'ON ' + v + '\n');
   };
+  stlGenerator.forBlock['stl_x'] = function (block, gen) {
+    var v = block.getFieldValue('VAR') || 'I0.0';
+    return withNext(block, gen, 'X ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_xn'] = function (block, gen) {
+    var v = block.getFieldValue('VAR') || 'I0.0';
+    return withNext(block, gen, 'XN ' + v + '\n');
+  };
   stlGenerator.forBlock['stl_not'] = function (block, gen) {
     return withNext(block, gen, 'NOT\n');
+  };
+  stlGenerator.forBlock['stl_save'] = function (block, gen) {
+    return withNext(block, gen, 'SAVE\n');
   };
   stlGenerator.forBlock['stl_l'] = function (block, gen) {
     var v = (block.getFieldValue('VALUE') || '').trim();
@@ -69,9 +80,33 @@
     var v = block.getFieldValue('TIMER') || 'T0';
     return withNext(block, gen, 'SD ' + v + '\n');
   };
+  stlGenerator.forBlock['stl_se'] = function (block, gen) {
+    var v = block.getFieldValue('TIMER') || 'T0';
+    return withNext(block, gen, 'SE ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_sp'] = function (block, gen) {
+    var v = block.getFieldValue('TIMER') || 'T0';
+    return withNext(block, gen, 'SP ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_ss'] = function (block, gen) {
+    var v = block.getFieldValue('TIMER') || 'T0';
+    return withNext(block, gen, 'SS ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_sf'] = function (block, gen) {
+    var v = block.getFieldValue('TIMER') || 'T0';
+    return withNext(block, gen, 'SF ' + v + '\n');
+  };
   stlGenerator.forBlock['stl_fr'] = function (block, gen) {
     var v = block.getFieldValue('TIMER') || 'T0';
     return withNext(block, gen, 'FR ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_fp'] = function (block, gen) {
+    var v = block.getFieldValue('VAR') || 'M0.0';
+    return withNext(block, gen, 'FP ' + v + '\n');
+  };
+  stlGenerator.forBlock['stl_fn'] = function (block, gen) {
+    var v = block.getFieldValue('VAR') || 'M0.0';
+    return withNext(block, gen, 'FN ' + v + '\n');
   };
   stlGenerator.forBlock['stl_assign'] = function (block, gen) {
     var v = block.getFieldValue('VAR') || 'Q0.0';
@@ -87,7 +122,7 @@
   };
   stlGenerator.forBlock['stl_label'] = function (block, gen) {
     var label = sanitizeLabel(block.getFieldValue('LABEL'));
-    return withNext(block, gen, label + ':\n');
+    return withNext(block, gen, label + ': ');
   };
   stlGenerator.forBlock['stl_jc'] = function (block, gen) {
     var label = sanitizeLabel(block.getFieldValue('LABEL'));
@@ -101,12 +136,28 @@
     var label = sanitizeLabel(block.getFieldValue('LABEL'));
     return withNext(block, gen, 'JU ' + label + '\n');
   };
+  stlGenerator.forBlock['stl_jcb'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    return withNext(block, gen, 'JCB ' + label + '\n');
+  };
+  stlGenerator.forBlock['stl_jnb'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    return withNext(block, gen, 'JNB ' + label + '\n');
+  };
+  stlGenerator.forBlock['stl_jbi'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    return withNext(block, gen, 'JBI ' + label + '\n');
+  };
+  stlGenerator.forBlock['stl_jnbi'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    return withNext(block, gen, 'JNBI ' + label + '\n');
+  };
   stlGenerator.forBlock['stl_jump_c_jc'] = function (block, gen) {
     var label = sanitizeLabel(block.getFieldValue('LABEL'));
     var bodyCode = gen.statementToCode(block, 'BODY');
     var out = 'JC ' + label + '\n';
     if (bodyCode) out += bodyCode;
-    out += label + ':\n';
+    out += label + ': ';
     return withNext(block, gen, out);
   };
   stlGenerator.forBlock['stl_jump_c_jcn'] = function (block, gen) {
@@ -114,7 +165,7 @@
     var bodyCode = gen.statementToCode(block, 'BODY');
     var out = 'JCN ' + label + '\n';
     if (bodyCode) out += bodyCode;
-    out += label + ':\n';
+    out += label + ': ';
     return withNext(block, gen, out);
   };
   stlGenerator.forBlock['stl_jump_c_ju'] = function (block, gen) {
@@ -122,7 +173,7 @@
     var bodyCode = gen.statementToCode(block, 'BODY');
     var out = 'JU ' + label + '\n';
     if (bodyCode) out += bodyCode;
-    out += label + ':\n';
+    out += label + ': ';
     return withNext(block, gen, out);
   };
   stlGenerator.forBlock['stl_comment'] = function (block, gen) {
@@ -130,6 +181,12 @@
     var line = text ? '// ' + text + '\n' : '';
     return withNext(block, gen, line);
   };
+  stlGenerator.forBlock['stl_var_input'] = function () { return ''; };
+  stlGenerator.forBlock['stl_var_output'] = function () { return ''; };
+  stlGenerator.forBlock['stl_var_transmitter'] = function () { return ''; };
+  stlGenerator.forBlock['stl_var_receiver'] = function () { return ''; };
+  stlGenerator.forBlock['stl_name'] = function () { return ''; };
+  stlGenerator.forBlock['stl_event_id'] = function () { return ''; };
   stlGenerator.forBlock['stl_group'] = function (block, gen) {
     var name = (block.getFieldValue('NAME') || 'Default').trim() || 'Default';
     var n = typeof gen.groupIndex === 'number' ? gen.groupIndex : 0;
@@ -141,6 +198,15 @@
   };
   stlGenerator.forBlock['stl_and_group_start'] = function (block, gen) {
     return withNext(block, gen, 'A(\n');
+  };
+  stlGenerator.forBlock['stl_on_group_start'] = function (block, gen) {
+    return withNext(block, gen, 'ON(\n');
+  };
+  stlGenerator.forBlock['stl_x_group_start'] = function (block, gen) {
+    return withNext(block, gen, 'X(\n');
+  };
+  stlGenerator.forBlock['stl_xn_group_start'] = function (block, gen) {
+    return withNext(block, gen, 'XN(\n');
   };
   stlGenerator.forBlock['stl_group_end'] = function (block, gen) {
     return withNext(block, gen, ')\n');

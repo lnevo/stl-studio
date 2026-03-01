@@ -1,6 +1,6 @@
 /**
  * STL importer: parse pasted STL text and build Blockly XML so it can be loaded.
- * Supports: CLR, SET, A/O/AN/ON Ix.x, =/S/R Qx.x, label:, JC/JCN/JU label, // comment.
+ * Supports: CLR, SET, A/O/AN/ON Ix.x, =/S/R Qx.x, FP/FN Mx.x (edge), label:, JC/JCN/JU label, // comment.
  */
 (function (global) {
   var Blockly = global.Blockly;
@@ -124,7 +124,16 @@
       case 'AN':
         return validLogicVar(arg) ? { type: 'stl_and_not', fields: { VAR: normVar(arg) } } : null;
       case 'ON':
+        if (arg === '(') return { type: 'stl_on_group_start', fields: {} };
         return validLogicVar(arg) ? { type: 'stl_or_not', fields: { VAR: normVar(arg) } } : null;
+      case 'X':
+        if (arg === '(') return { type: 'stl_x_group_start', fields: {} };
+        return validLogicVar(arg) ? { type: 'stl_x', fields: { VAR: normVar(arg) } } : null;
+      case 'XN':
+        if (arg === '(') return { type: 'stl_xn_group_start', fields: {} };
+        return validLogicVar(arg) ? { type: 'stl_xn', fields: { VAR: normVar(arg) } } : null;
+      case 'SAVE':
+        return { type: 'stl_save', fields: {} };
       case 'NOT':
         return { type: 'stl_not', fields: {} };
       case '=':
@@ -139,16 +148,42 @@
         return { type: 'stl_jcn', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
       case 'JU':
         return { type: 'stl_ju', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+      case 'JCB':
+        return { type: 'stl_jcb', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+      case 'JNB':
+        return { type: 'stl_jnb', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+      case 'JBI':
+        return { type: 'stl_jbi', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+      case 'JNBI':
+        return { type: 'stl_jnbi', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
       case 'L':
         return parseL(parts.slice(1).join(' ').trim());
       case 'SD':
         return validTimer(arg) ? { type: 'stl_sd', fields: { TIMER: normVar(arg) } } : null;
+      case 'SE':
+        return validTimer(arg) ? { type: 'stl_se', fields: { TIMER: normVar(arg) } } : null;
+      case 'SP':
+        return validTimer(arg) ? { type: 'stl_sp', fields: { TIMER: normVar(arg) } } : null;
+      case 'SS':
+        return validTimer(arg) ? { type: 'stl_ss', fields: { TIMER: normVar(arg) } } : null;
+      case 'SF':
+        return validTimer(arg) ? { type: 'stl_sf', fields: { TIMER: normVar(arg) } } : null;
       case 'FR':
         return validTimer(arg) ? { type: 'stl_fr', fields: { TIMER: normVar(arg) } } : null;
+      case 'FP':
+        return validMQYZ(arg) ? { type: 'stl_fp', fields: { VAR: normVar(arg) } } : null;
+      case 'FN':
+        return validMQYZ(arg) ? { type: 'stl_fn', fields: { VAR: normVar(arg) } } : null;
       case 'O(':
         return { type: 'stl_or_group_start', fields: {} };
       case 'A(':
         return { type: 'stl_and_group_start', fields: {} };
+      case 'ON(':
+        return { type: 'stl_on_group_start', fields: {} };
+      case 'X(':
+        return { type: 'stl_x_group_start', fields: {} };
+      case 'XN(':
+        return { type: 'stl_xn_group_start', fields: {} };
       case ')':
         return { type: 'stl_group_end', fields: {} };
       default:
@@ -231,6 +266,33 @@
         triedCompact = true;
         continue;
       }
+      if ((m = /^ON\s*\(/.exec(rest))) {
+        list.push({ type: 'stl_on_group_start', fields: {} });
+        groupDepth++;
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = /^XN\s*\(/.exec(rest))) {
+        list.push({ type: 'stl_xn_group_start', fields: {} });
+        groupDepth++;
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = /^X\s*\(/.exec(rest))) {
+        list.push({ type: 'stl_x_group_start', fields: {} });
+        groupDepth++;
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = /^SAVE\b/i.exec(rest))) {
+        list.push({ type: 'stl_save', fields: {} });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
       if ((m = /^CLR/i.exec(rest))) {
         list.push({ type: 'stl_clear', fields: {} });
         rest = rest.slice(m[0].length);
@@ -257,6 +319,18 @@
       }
       if ((m = new RegExp('^O' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_or', fields: { VAR: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^XN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validLogicVar(m[1])) {
+        list.push({ type: 'stl_xn', fields: { VAR: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^X' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validLogicVar(m[1])) {
+        list.push({ type: 'stl_x', fields: { VAR: normVar(m[1]) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
@@ -327,6 +401,42 @@
         triedCompact = true;
         continue;
       }
+      if ((m = new RegExp('^SE' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
+        list.push({ type: 'stl_se', fields: { TIMER: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^SP' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
+        list.push({ type: 'stl_sp', fields: { TIMER: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^SS' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
+        list.push({ type: 'stl_ss', fields: { TIMER: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^SF' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
+        list.push({ type: 'stl_sf', fields: { TIMER: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^FP' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validMQYZ(m[1])) {
+        list.push({ type: 'stl_fp', fields: { VAR: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^FN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validMQYZ(m[1])) {
+        list.push({ type: 'stl_fn', fields: { VAR: normVar(m[1]) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
       if ((m = new RegExp('^JC' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_jc', fields: { LABEL: m[1].slice(0, 4) } });
         rest = rest.slice(m[0].length);
@@ -341,6 +451,30 @@
       }
       if ((m = new RegExp('^JU' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_ju', fields: { LABEL: m[1].slice(0, 4) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^JCB' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jcb', fields: { LABEL: m[1].slice(0, 4) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^JNB' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jnb', fields: { LABEL: m[1].slice(0, 4) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^JBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jbi', fields: { LABEL: m[1].slice(0, 4) } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^JNBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jnbi', fields: { LABEL: m[1].slice(0, 4) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;

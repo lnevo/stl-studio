@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.10';</script>
+  <script>var APP_VERSION = '1.12';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -34,9 +34,14 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+    .header-top {
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
       gap: 0.75rem;
     }
     header h1 {
@@ -51,10 +56,9 @@
       color: var(--muted);
     }
     .header-github {
-      margin-left: auto;
       display: flex;
       align-items: center;
-      padding-right: 0.75rem;
+      flex-shrink: 0;
     }
     .header-github a {
       display: flex;
@@ -72,8 +76,10 @@
     }
     .header-actions {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 0.5rem;
+      width: 100%;
     }
     button {
       font-family: inherit;
@@ -115,6 +121,11 @@
     }
     body .blocklyFlyoutLabelText {
       fill: #1a1d23 !important;
+    }
+    /* Wider default for Blockly text input fields so they don't look like buttons */
+    #blocklyDiv .blocklyHtmlInput {
+      min-width: 140px !important;
+      width: 12em !important;
     }
     #stlPanel {
       width: var(--stl-panel-width, 360px);
@@ -338,14 +349,16 @@
 </head>
 <body>
   <header>
-    <div>
-      <h1>STL Studio <span id="appVersion"></span></h1>
-      <p>Build logic for Tower LCC+Q; copy the generated STL into your node via Configure Nodes.</p>
-    </div>
-    <div class="header-github">
-      <a href="https://github.com/lnevo/stl-studio" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
-        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="" width="24" height="24">
-      </a>
+    <div class="header-top">
+      <div>
+        <h1>STL Studio <span id="appVersion"></span></h1>
+        <p>Build logic for Tower LCC+Q; copy the generated STL into your node via Configure Nodes.</p>
+      </div>
+      <div class="header-github">
+        <a href="https://github.com/lnevo/stl-studio" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
+          <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="" width="24" height="24">
+        </a>
+      </div>
     </div>
     <div class="header-actions">
       <button type="button" id="btnCopy" class="primary">Copy to clipboard</button>
@@ -354,6 +367,7 @@
       <button type="button" id="btnDownloadConfigBackup" title="Download updated backup (logic only)" style="display: none;">Download backup</button>
       <button type="button" id="btnImport">Import STL…</button>
       <button type="button" id="btnExample">Load example</button>
+      <button type="button" id="btnClear" title="Remove all blocks from the workspace">Clear all blocks</button>
       <button type="button" id="btnLogicStringHelp" title="How the blocks work together">How do the blocks work?</button>
       <button type="button" id="btnInputsRef" title="Quick help and reference">Help</button>
     </div>
@@ -382,6 +396,14 @@
       </div>
     </aside>
   </main>
+
+  <div id="messageModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="messageModalTitle">
+      <h3 id="messageModalTitle"></h3>
+      <p id="messageModalBody" style="margin: 1rem;"></p>
+      <div class="modal-actions" id="messageModalActions"></div>
+    </div>
+  </div>
 
   <div id="csvDownloadModal" class="modal-overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-labelledby="csvDownloadModalTitle">
@@ -447,7 +469,6 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <style>
     /* Override Blockly toolbox text (loaded after Blockly so it wins) */
     body .blocklyToolboxDiv,
@@ -461,14 +482,45 @@
     .blocklyToolboxCategoryLabel { color: #1a1d23 !important; }
     body .blocklyFlyoutLabelText { fill: #1a1d23 !important; }
   </style>
-  <script src="stl-blocks.js"></script>
-  <script src="stl-generator.js"></script>
-  <script src="stl-importer.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     (function () {
+      var TOOLTIP_HOVER_MS = 250;
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      function loadBlocklyThenInit() {
+        var blocklyUrl = 'https://unpkg.com/blockly/blockly.min.js';
+        fetch(blocklyUrl)
+          .then(function (r) { return r.text(); })
+          .then(function (code) {
+            code = code.replace(/(HOVER_MS\$\$[^=]+)=750/, '$1=' + TOOLTIP_HOVER_MS);
+            var script = document.createElement('script');
+            script.textContent = code;
+            document.head.appendChild(script);
+            return loadScript('stl-blocks.js');
+          })
+          .then(function () { return loadScript('stl-generator.js'); })
+          .then(function () { return loadScript('stl-importer.js'); })
+          .then(initApp)
+          .catch(function () {
+            var script = document.createElement('script');
+            script.src = blocklyUrl;
+            script.onload = function () {
+              loadScript('stl-blocks.js').then(function () { return loadScript('stl-generator.js'); }).then(function () { return loadScript('stl-importer.js'); }).then(initApp);
+            };
+            document.head.appendChild(script);
+          });
+      }
+      function initApp() {
       (function setVersion() {
-        var v = window.APP_VERSION || '1.10';
+        var v = window.APP_VERSION || '1.12';
         document.title = 'STL Studio ' + v;
         var el = document.getElementById('appVersion');
         if (el) el.textContent = v;
@@ -479,7 +531,7 @@
           {
             kind: 'category',
             name: 'Logic (RLO)',
-            colour: '#b39500',
+            colour: '#5ba6a6',
             contents: [
               { kind: 'block', type: 'stl_clear' },
               { kind: 'block', type: 'stl_set' },
@@ -487,13 +539,16 @@
               { kind: 'block', type: 'stl_or' },
               { kind: 'block', type: 'stl_and_not' },
               { kind: 'block', type: 'stl_or_not' },
-              { kind: 'block', type: 'stl_not' }
+              { kind: 'block', type: 'stl_not' },
+              { kind: 'block', type: 'stl_x' },
+              { kind: 'block', type: 'stl_xn' },
+              { kind: 'block', type: 'stl_save' }
             ]
           },
           {
             kind: 'category',
             name: 'Outputs',
-            colour: '#5c7e00',
+            colour: '#a65b5b',
             contents: [
               { kind: 'block', type: 'stl_assign' },
               { kind: 'block', type: 'stl_s' },
@@ -503,17 +558,30 @@
           {
             kind: 'category',
             name: 'Timers',
-            colour: '#6b2d8e',
+            colour: '#5b74a6',
             contents: [
               { kind: 'block', type: 'stl_l_time' },
               { kind: 'block', type: 'stl_sd' },
+              { kind: 'block', type: 'stl_se' },
+              { kind: 'block', type: 'stl_sp' },
+              { kind: 'block', type: 'stl_ss' },
+              { kind: 'block', type: 'stl_sf' },
               { kind: 'block', type: 'stl_fr' }
             ]
           },
           {
             kind: 'category',
+            name: 'Edge',
+            colour: '#b8a83a',
+            contents: [
+              { kind: 'block', type: 'stl_fp' },
+              { kind: 'block', type: 'stl_fn' }
+            ]
+          },
+          {
+            kind: 'category',
             name: 'Jumps',
-            colour: '#006b9e',
+            colour: '#4CAF50',
             contents: [
               { kind: 'block', type: 'stl_jump_c_jc' },
               { kind: 'block', type: 'stl_jump_c_jcn' },
@@ -521,23 +589,42 @@
               { kind: 'block', type: 'stl_jc' },
               { kind: 'block', type: 'stl_jcn' },
               { kind: 'block', type: 'stl_ju' },
+              { kind: 'block', type: 'stl_jcb' },
+              { kind: 'block', type: 'stl_jnb' },
+              { kind: 'block', type: 'stl_jbi' },
+              { kind: 'block', type: 'stl_jnbi' },
               { kind: 'block', type: 'stl_label' }
             ]
           },
           {
             kind: 'category',
             name: 'Nesting',
-            colour: '#5c7e00',
+            colour: '#c47c30',
             contents: [
               { kind: 'block', type: 'stl_or_group_start' },
+              { kind: 'block', type: 'stl_on_group_start' },
               { kind: 'block', type: 'stl_and_group_start' },
+              { kind: 'block', type: 'stl_x_group_start' },
+              { kind: 'block', type: 'stl_xn_group_start' },
               { kind: 'block', type: 'stl_group_end' }
             ]
           },
           {
             kind: 'category',
-            name: 'Comment & group',
-            colour: '#8b6914',
+            name: 'Variables',
+            colour: '#7B1FA2',
+            contents: [
+              { kind: 'block', type: 'stl_var_input' },
+              { kind: 'block', type: 'stl_var_output' },
+              { kind: 'block', type: 'stl_var_receiver' },
+              { kind: 'block', type: 'stl_var_transmitter' },
+              { kind: 'block', type: 'stl_event_id' }
+            ]
+          },
+          {
+            kind: 'category',
+            name: 'Comments',
+            colour: '#5c6bc0',
             contents: [
               { kind: 'block', type: 'stl_group' },
               { kind: 'block', type: 'stl_comment' }
@@ -552,9 +639,7 @@
         zoom: { controls: true, wheel: true, startScale: 1, maxScale: 3, minScale: 0.3 },
         trashcan: true
       });
-      if (Blockly.Tooltip && typeof Blockly.Tooltip.HOVER_MS !== 'undefined') {
-        Blockly.Tooltip.HOVER_MS = 5;
-      }
+      if (Blockly.Tooltip) Blockly.Tooltip.HOVER_MS = TOOLTIP_HOVER_MS;
 
       function applyToolboxDarkText() {
         var toolbox = document.querySelector('.blocklyToolboxDiv');
@@ -582,22 +667,36 @@
       var stlRawPane = document.getElementById('stlRawPane');
       var stlExpandedPane = document.getElementById('stlExpandedPane');
       var lastCode = '';
-      var BYTES_PER_GROUP = 255;
-      var TOTAL_BYTES_LIMIT = 255 * 16;
+      /** Per Tower LCC+Q manual: "Each MultiLine has room for 256 characters" (16 groups × 256 = 4,096 total). */
+      var BYTES_PER_GROUP = 256;
+      var TOTAL_BYTES_LIMIT = 256 * 16;
 
       function getByteCount(str) {
         if (!str) return 0;
-        if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(str).length;
-        return str.length;
+        var normalized = (str + '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(normalized).length;
+        return normalized.length;
       }
 
-      /** Split STL by group headers; return array of byte counts per group. */
+      /**
+       * Split STL by group headers; return array of byte counts per group.
+       * Counts only the group body (logic), not the "// Group N: name" line, so the result
+       * matches what is stored in Conditionals.Logic(n).MultiLine and what JMRI reports.
+       * Line endings are normalized to \\n before counting so \\r\\n does not double-count.
+       */
       function getPerGroupByteCounts(formatted) {
         if (!formatted || !formatted.trim()) return [];
-        var segments = formatted.split(/(?=\/\/ Group \d+:)/);
-        if (segments.length === 1) return [getByteCount(segments[0].trim())];
+        var normalized = (formatted + '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        var re = /\/\/ Group \d+:[\s\S]*?(?=\/\/ Group \d+:|$)/g;
         var out = [];
-        for (var i = 1; i < segments.length; i++) out.push(getByteCount(segments[i]));
+        var m;
+        while ((m = re.exec(normalized)) !== null) {
+          var segment = m[0];
+          var firstLineEnd = segment.indexOf('\n');
+          var body = firstLineEnd >= 0 ? segment.slice(firstLineEnd + 1).trim() : '';
+          out.push(getByteCount(body));
+        }
+        if (out.length === 0) return [getByteCount((normalized).trim())];
         return out;
       }
 
@@ -638,8 +737,8 @@
           }
           return;
         }
-        var totalBytes = getByteCount(formatted);
         var perGroup = getPerGroupByteCounts(formatted);
+        var totalBytes = perGroup.length > 0 ? perGroup.reduce(function (a, b) { return a + b; }, 0) : getByteCount(formatted);
         var overGroup = false;
         for (var j = 0; j < perGroup.length; j++) {
           if (perGroup[j] > BYTES_PER_GROUP) overGroup = true;
@@ -706,8 +805,10 @@
           for (var g = 0; g < groupBlocks.length; g++) {
             var f = groupBlocks[g].getField('GROUP_BYTES');
             if (f && perGroup[g] !== undefined) {
-              var txt = perGroup[g] + ' bytes';
-              if (perGroup[g] > BYTES_PER_GROUP) txt += ' — over 255';
+              var bytes = perGroup[g];
+              var pct = Math.round((bytes / BYTES_PER_GROUP) * 100);
+              var txt = bytes + ' bytes (' + pct + '%)';
+              if (bytes > BYTES_PER_GROUP) txt += ' — over ' + BYTES_PER_GROUP;
               groupBlocks[g].setFieldValue(txt, 'GROUP_BYTES');
             }
           }
@@ -729,9 +830,11 @@
           for (var i = 0; i < lines.length; i++) {
             var t = lines[i].trim();
             if (!t) continue;
-            var compact = t.indexOf('//') === 0 ? t : t.replace(/^(\S+)\s+(.*)$/, '$1$2');
-            out += compact;
-            if (t.indexOf('//') === 0 || t.slice(-1) === ':') out += '\n';
+            var compact;
+            if (t.indexOf('//') === 0) compact = t;
+            else if (/^[A-Za-z0-9]{1,4}:\s+\S+/.test(t)) compact = t;
+            else compact = t.replace(/^(\S+)\s+(.*)$/, '$1$2');
+            out += compact + '\n';
           }
           return out;
         }
@@ -950,8 +1053,10 @@
       var changeTimeout;
       ws.addChangeListener(function () {
         clearTimeout(changeTimeout);
+        refreshJmriFromWorkspace(ws);
         changeTimeout = setTimeout(updateStl, 400);
       });
+      refreshJmriFromWorkspace(ws);
 
       document.getElementById('btnCopy').onclick = function () {
         updateStl();
@@ -966,7 +1071,10 @@
       document.getElementById('btnDownload').onclick = function () {
         updateStl();
         var content = getFormattedStl();
-        if (!content || content.indexOf('// No blocks') === 0) return;
+        if (!content || content.indexOf('// No blocks') === 0) {
+          showMessageModal('Download STL', 'There is no STL to download. Add blocks from the toolbox to the workspace first.');
+          return;
+        }
         var blob = new Blob([content], { type: 'text/plain' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -1061,20 +1169,91 @@
         return out.join('\r\n');
       }
 
+      /** True if this category has at least one row with name or event IDs set (so user has defined it). */
+      function hasDefinedJmriRows(rows, kind) {
+        if (!rows || !rows.length) return false;
+        for (var idx = 0; idx < rows.length; idx++) {
+          var r = rows[idx];
+          if (kind === 'input' || kind === 'output') {
+            if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim())) return true;
+          } else {
+            if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim())) return true;
+          }
+        }
+        return false;
+      }
+
+      var messageModal = document.getElementById('messageModal');
+      var messageModalTitle = document.getElementById('messageModalTitle');
+      var messageModalBody = document.getElementById('messageModalBody');
+      var messageModalActions = document.getElementById('messageModalActions');
+      function closeMessageModal() {
+        messageModal.classList.remove('visible');
+        messageModal.setAttribute('aria-hidden', 'true');
+      }
+      function showMessageModal(title, message) {
+        messageModalTitle.textContent = title;
+        messageModalBody.textContent = message;
+        messageModalActions.innerHTML = '';
+        var ok = document.createElement('button');
+        ok.type = 'button';
+        ok.className = 'primary';
+        ok.textContent = 'OK';
+        ok.onclick = closeMessageModal;
+        messageModalActions.appendChild(ok);
+        messageModal.classList.add('visible');
+        messageModal.setAttribute('aria-hidden', 'false');
+      }
+      function showConfirmModal(title, message, primaryLabel, onPrimary) {
+        messageModalTitle.textContent = title;
+        messageModalBody.textContent = message;
+        messageModalActions.innerHTML = '';
+        var cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = closeMessageModal;
+        var primary = document.createElement('button');
+        primary.type = 'button';
+        primary.className = 'primary';
+        primary.textContent = primaryLabel;
+        primary.onclick = function () {
+          closeMessageModal();
+          if (onPrimary) onPrimary();
+        };
+        messageModalActions.appendChild(cancel);
+        messageModalActions.appendChild(primary);
+        messageModal.classList.add('visible');
+        messageModal.setAttribute('aria-hidden', 'false');
+      }
+      messageModal.onclick = function (e) {
+        if (e.target === messageModal) closeMessageModal();
+      };
+
       var csvDownloadModal = document.getElementById('csvDownloadModal');
       function openCsvDownloadModal() {
+        updateStl();
+        refreshJmriFromWorkspace(ws);
+        var hasStl = getFormattedStl() && getFormattedStl().indexOf('// No blocks') !== 0;
+        var inputsDefined = hasDefinedJmriRows(window.stlJmriInputs, 'input');
+        var outputsDefined = hasDefinedJmriRows(window.stlJmriOutputs, 'output');
+        var txDefined = hasDefinedJmriRows(window.stlJmriTransmitters, 'tx');
+        var rxDefined = hasDefinedJmriRows(window.stlJmriReceivers, 'rx');
+        if (!hasStl && !inputsDefined && !outputsDefined && !txDefined && !rxDefined) {
+          showMessageModal('Download CSV', 'There are no CSV files to download. Add logic blocks and/or variable blocks (with names or event IDs) to enable CSV export.');
+          return;
+        }
         var g = document.getElementById('csvOptGroupLogic');
         var i = document.getElementById('csvOptInputs');
         var o = document.getElementById('csvOptOutputs');
         var t = document.getElementById('csvOptTransmitters');
         var r = document.getElementById('csvOptReceivers');
         var z = document.getElementById('csvOptZip');
-        if (g) g.style.display = ''; /* group_logic always available from workspace */
-        if (i) i.style.display = window.stlJmriInputs ? '' : 'none';
-        if (o) o.style.display = window.stlJmriOutputs ? '' : 'none';
-        if (t) t.style.display = window.stlJmriTransmitters ? '' : 'none';
-        if (r) r.style.display = window.stlJmriReceivers ? '' : 'none';
-        if (z) z.style.display = window.stlJmriInputs ? '' : 'none'; /* ZIP when we have JMRI set */
+        if (g) g.style.display = hasStl ? '' : 'none';
+        if (i) i.style.display = inputsDefined ? '' : 'none';
+        if (o) o.style.display = outputsDefined ? '' : 'none';
+        if (t) t.style.display = txDefined ? '' : 'none';
+        if (r) r.style.display = rxDefined ? '' : 'none';
+        if (z) z.style.display = (inputsDefined || outputsDefined || txDefined || rxDefined) ? '' : 'none';
         csvDownloadModal.classList.add('visible');
         csvDownloadModal.setAttribute('aria-hidden', 'false');
       }
@@ -1104,44 +1283,46 @@
         closeCsvDownloadModal();
       };
       document.getElementById('csvOptInputs').onclick = function () {
-        if (!window.stlJmriInputs) return;
+        if (!window.stlJmriInputs || !hasDefinedJmriRows(window.stlJmriInputs, 'input')) return;
         var csv = jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs);
         downloadCsvFile('inputs.csv', csv);
         closeCsvDownloadModal();
       };
       document.getElementById('csvOptOutputs').onclick = function () {
-        if (!window.stlJmriOutputs) return;
+        if (!window.stlJmriOutputs || !hasDefinedJmriRows(window.stlJmriOutputs, 'output')) return;
         var csv = jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs);
         downloadCsvFile('outputs.csv', csv);
         closeCsvDownloadModal();
       };
       document.getElementById('csvOptTransmitters').onclick = function () {
-        if (!window.stlJmriTransmitters) return;
+        if (!window.stlJmriTransmitters || !hasDefinedJmriRows(window.stlJmriTransmitters, 'tx')) return;
         var csv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters);
         downloadCsvFile('transmitters.csv', csv);
         closeCsvDownloadModal();
       };
       document.getElementById('csvOptReceivers').onclick = function () {
-        if (!window.stlJmriReceivers) return;
+        if (!window.stlJmriReceivers || !hasDefinedJmriRows(window.stlJmriReceivers, 'rx')) return;
         var csv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers);
         downloadCsvFile('receivers.csv', csv);
         closeCsvDownloadModal();
       };
       document.getElementById('csvOptZip').onclick = function () {
-        if (!window.stlJmriInputs || typeof JSZip === 'undefined') return;
+        if (typeof JSZip === 'undefined') return;
         updateStl();
+        refreshJmriFromWorkspace(ws);
+        var inputsDefined = hasDefinedJmriRows(window.stlJmriInputs, 'input');
+        var outputsDefined = hasDefinedJmriRows(window.stlJmriOutputs, 'output');
+        var txDefined = hasDefinedJmriRows(window.stlJmriTransmitters, 'tx');
+        var rxDefined = hasDefinedJmriRows(window.stlJmriReceivers, 'rx');
+        if (!inputsDefined && !outputsDefined && !txDefined && !rxDefined) return;
         var readable = formatStl(lastCode, 'readable');
-        var groupLogicCsv = stlToJmriCsv(readable, window.stlFriendlyNames) || '';
-        var inputsCsv = jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs);
-        var outputsCsv = jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs);
-        var transmittersCsv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters);
-        var receiversCsv = jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers);
+        var hasStl = readable && readable.indexOf('// No blocks') !== 0;
         var zip = new JSZip();
-        zip.file('group_logic.csv', groupLogicCsv);
-        zip.file('inputs.csv', inputsCsv);
-        zip.file('outputs.csv', outputsCsv);
-        zip.file('transmitters.csv', transmittersCsv);
-        zip.file('receivers.csv', receiversCsv);
+        if (hasStl) zip.file('group_logic.csv', stlToJmriCsv(readable, window.stlFriendlyNames) || '');
+        if (inputsDefined && window.stlJmriInputs) zip.file('inputs.csv', jmriCsvFromRows(['Input', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriInputs));
+        if (outputsDefined && window.stlJmriOutputs) zip.file('outputs.csv', jmriCsvFromRows(['Output', 'Name', 'True Event ID', 'False Event ID'], window.stlJmriOutputs));
+        if (txDefined && window.stlJmriTransmitters) zip.file('transmitters.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriTransmitters));
+        if (rxDefined && window.stlJmriReceivers) zip.file('receivers.csv', jmriCsvFromRows(['Circuit', 'Name', 'Event ID'], window.stlJmriReceivers));
         zip.generateAsync({ type: 'blob' }).then(function (content) {
           var a = document.createElement('a');
           a.href = URL.createObjectURL(content);
@@ -1213,6 +1394,14 @@
         return t.length > 100 && /Conditionals\.Logic\(\d+\)\.MultiLine=/m.test(t);
       }
 
+      /** Treat event ID 00.00.00.00.00.00.00.00 as not filled in; return '' so it is ignored when importing. */
+      function normalizeEventId(id) {
+        var s = (id || '').trim();
+        if (!s) return '';
+        if (/^00\.00\.00\.00\.00\.00\.00\.00$/i.test(s)) return '';
+        return s;
+      }
+
       /** Parse config backup for Logic Inputs/Outputs descriptions. Returns map e.g. { "I0.0": "East Local", "Q0.0": "East Out" }. */
       function parseConfigFriendlyNames(configText) {
         var map = {};
@@ -1248,8 +1437,8 @@
           var key = 'I' + m[1] + '.' + m[2];
           if (!byKey[key]) byKey[key] = { input: key, name: '', trueId: '', falseId: '' };
           if (m[3] === 'Input Description') byKey[key].name = (m[4] || '').trim();
-          else if (m[3] === 'True') byKey[key].trueId = (m[4] || '').trim();
-          else if (m[3] === 'False') byKey[key].falseId = (m[4] || '').trim();
+          else if (m[3] === 'True') byKey[key].trueId = normalizeEventId(m[4]);
+          else if (m[3] === 'False') byKey[key].falseId = normalizeEventId(m[4]);
         }
         var out = [];
         for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
@@ -1271,8 +1460,8 @@
           var key = 'Q' + m[1] + '.' + m[2];
           if (!byKey[key]) byKey[key] = { output: key, name: '', trueId: '', falseId: '' };
           if (m[3] === 'Output Description') byKey[key].name = (m[4] || '').trim();
-          else if (m[3] === 'True') byKey[key].trueId = (m[4] || '').trim();
-          else if (m[3] === 'False') byKey[key].falseId = (m[4] || '').trim();
+          else if (m[3] === 'True') byKey[key].trueId = normalizeEventId(m[4]);
+          else if (m[3] === 'False') byKey[key].falseId = normalizeEventId(m[4]);
         }
         var out = [];
         for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
@@ -1295,7 +1484,7 @@
           if (idx < 0 || idx > 15) continue;
           if (!byIdx[idx]) byIdx[idx] = { circuit: 'Z' + idx, name: '', eventId: '' };
           if (m[2] === 'Track Circuit Description') byIdx[idx].name = (m[3] || '').trim();
-          else if (m[2] === 'Link Address') byIdx[idx].eventId = (m[3] || '').trim();
+          else if (m[2] === 'Link Address') byIdx[idx].eventId = normalizeEventId(m[3]);
         }
         var out = [];
         for (var n = 0; n < 16; n++) {
@@ -1317,7 +1506,7 @@
           if (idx < 0 || idx > 15) continue;
           if (!byIdx[idx]) byIdx[idx] = { circuit: 'Y' + idx, name: '', eventId: '' };
           if (m[2] === 'Remote Mast Description') byIdx[idx].name = (m[3] || '').trim();
-          else if (m[2] === 'Link Address') byIdx[idx].eventId = (m[3] || '').trim();
+          else if (m[2] === 'Link Address') byIdx[idx].eventId = normalizeEventId(m[3]);
         }
         var out = [];
         for (var n = 0; n < 16; n++) {
@@ -1334,6 +1523,115 @@
           out.push(rows[i].map(function (v, idx) { return formatCsvCell(v, idx === 0); }).join(','));
         }
         return out.join('\r\n');
+      }
+
+      /** Get the block connected to this block's output (right connection). */
+      function getBlockOutputTarget(block) {
+        if (!block) return null;
+        var conn = block.outputConnection || (block.getOutput && block.getOutput(0));
+        if (!conn) return null;
+        return conn.targetBlock ? conn.targetBlock() : null;
+      }
+
+      /** Get the block connected to this block's value input (e.g. RIGHT or CHAIN). */
+      function getBlockInputTarget(block, inputName) {
+        if (!block || !inputName) return null;
+        var input = block.getInput && block.getInput(inputName);
+        if (!input || !input.connection) return null;
+        var target = input.connection.targetBlock && input.connection.targetBlock();
+        return target || null;
+      }
+
+      /** Build JMRI tables from Variable blocks in the workspace. Returns { inputs, outputs, transmitters, receivers } (full arrays). Merges with config data if present. */
+      function buildJmriFromVariableBlocks(workspace) {
+        var configInputs = window.stlConfigBackupRaw ? parseConfigJmriInputs(window.stlConfigBackupRaw) : null;
+        var configOutputs = window.stlConfigBackupRaw ? parseConfigJmriOutputs(window.stlConfigBackupRaw) : null;
+        var configTx = window.stlConfigBackupRaw ? parseConfigJmriTransmitters(window.stlConfigBackupRaw) : null;
+        var configRx = window.stlConfigBackupRaw ? parseConfigJmriReceivers(window.stlConfigBackupRaw) : null;
+        function defaultInputs() {
+          var out = [];
+          for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
+            var k = 'I' + g + '.' + b;
+            out.push([k, '', '', '']);
+          }
+          return out;
+        }
+        function defaultOutputs() {
+          var out = [];
+          for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
+            var k = 'Q' + g + '.' + b;
+            out.push([k, '', '', '']);
+          }
+          return out;
+        }
+        function defaultTx() {
+          var out = [];
+          for (var n = 0; n < 16; n++) out.push(['Z' + n, '', '']);
+          return out;
+        }
+        function defaultRx() {
+          var out = [];
+          for (var n = 0; n < 16; n++) out.push(['Y' + n, '', '']);
+          return out;
+        }
+        var byInput = {};
+        var byOutput = {};
+        var byTx = {};
+        var byRx = {};
+        if (configInputs) for (var i = 0; i < configInputs.length; i++) { var r = configInputs[i]; byInput[r[0]] = r; }
+        if (configOutputs) for (var j = 0; j < configOutputs.length; j++) { var s = configOutputs[j]; byOutput[s[0]] = s; }
+        if (configTx) for (var t = 0; t < configTx.length; t++) { var u = configTx[t]; byTx[u[0]] = u; }
+        if (configRx) for (var v = 0; v < configRx.length; v++) { var w = configRx[v]; byRx[w[0]] = w; }
+        function applyVarBlock(block, type, key, byKey) {
+          if (!key) return;
+          if (!byKey[key]) byKey[key] = type === 'input' || type === 'output' ? [key, '', '', ''] : [key, '', ''];
+          var nameVal = (block.getFieldValue && block.getFieldValue('NAME')) || '';
+          byKey[key][1] = String(nameVal).trim();
+          var b = getBlockInputTarget(block, 'RIGHT');
+          if (b && b.type === 'stl_event_id') {
+            var trueId = String((b.getFieldValue && b.getFieldValue('TRUE_ID')) || '').trim();
+            var falseId = String((b.getFieldValue && b.getFieldValue('FALSE_ID')) || '').trim();
+            if (type === 'input' || type === 'output') {
+              byKey[key][2] = trueId;
+              byKey[key][3] = falseId;
+            } else {
+              byKey[key][2] = trueId || falseId;
+            }
+          }
+        }
+        var blocks = workspace && workspace.getAllBlocks ? workspace.getAllBlocks(false) : [];
+        for (var bi = 0; bi < blocks.length; bi++) {
+          var block = blocks[bi];
+          var type = block.type;
+          if (type === 'stl_var_input') applyVarBlock(block, 'input', (block.getFieldValue && block.getFieldValue('VAR')) || '', byInput);
+          else if (type === 'stl_var_output') applyVarBlock(block, 'output', (block.getFieldValue && block.getFieldValue('VAR')) || '', byOutput);
+          else if (type === 'stl_var_transmitter') applyVarBlock(block, 'tx', (block.getFieldValue && block.getFieldValue('CIRCUIT')) || '', byTx);
+          else if (type === 'stl_var_receiver') applyVarBlock(block, 'rx', (block.getFieldValue && block.getFieldValue('CIRCUIT')) || '', byRx);
+        }
+        var inputs = defaultInputs();
+        for (var ii = 0; ii < inputs.length; ii++) { var key = inputs[ii][0]; if (byInput[key]) inputs[ii] = byInput[key]; }
+        var outputs = defaultOutputs();
+        for (var oi = 0; oi < outputs.length; oi++) { var ok = outputs[oi][0]; if (byOutput[ok]) outputs[oi] = byOutput[ok]; }
+        var transmitters = defaultTx();
+        for (var ti = 0; ti < transmitters.length; ti++) { var tk = transmitters[ti][0]; if (byTx[tk]) transmitters[ti] = byTx[tk]; }
+        var receivers = defaultRx();
+        for (var ri = 0; ri < receivers.length; ri++) { var rk = receivers[ri][0]; if (byRx[rk]) receivers[ri] = byRx[rk]; }
+        return { inputs: inputs, outputs: outputs, transmitters: transmitters, receivers: receivers };
+      }
+
+      /** Refresh JMRI tables and friendly names from workspace (Variable blocks + config). Call on workspace change and before opening CSV modal. */
+      function refreshJmriFromWorkspace(workspace) {
+        if (!workspace) return;
+        var data = buildJmriFromVariableBlocks(workspace);
+        window.stlJmriInputs = data.inputs;
+        window.stlJmriOutputs = data.outputs;
+        window.stlJmriTransmitters = data.transmitters;
+        window.stlJmriReceivers = data.receivers;
+        var names = {};
+        for (var i = 0; i < data.inputs.length; i++) { var r = data.inputs[i]; if (r[1]) names[r[0]] = r[1]; }
+        for (var j = 0; j < data.outputs.length; j++) { var s = data.outputs[j]; if (s[1]) names[s[0]] = s[1]; }
+        window.stlFriendlyNames = names;
+        if (window.refreshBlockVarOptions) refreshBlockVarOptions(workspace);
       }
 
       /** After loading friendly names (config backup), refresh VAR dropdowns so blocks show "I0.0 – Description". */
@@ -1705,6 +2003,7 @@
           var xmlDom = xmlTextToDom(result.xml);
           ws.clear();
           Blockly.Xml.domToWorkspace(xmlDom, ws);
+          if (window.stlConfigBackupRaw) addVariableBlocksFromBackup(ws);
           if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length) refreshBlockVarOptions(ws);
           closeImportModal();
           var runConnect = function () {
@@ -1778,8 +2077,157 @@
         }
       };
 
+      document.getElementById('btnClear').onclick = function () {
+        showConfirmModal('Clear all blocks', 'Clear all blocks from the workspace? This cannot be undone.', 'Clear all blocks', function () {
+          ws.clear();
+          window.stlConfigBackupRaw = null;
+          window.stlJmriInputs = null;
+          window.stlJmriOutputs = null;
+          window.stlJmriTransmitters = null;
+          window.stlJmriReceivers = null;
+          window.stlFriendlyNames = {};
+          var configBackupBtn = document.getElementById('btnDownloadConfigBackup');
+          if (configBackupBtn) {
+            configBackupBtn.style.display = 'none';
+            configBackupBtn.disabled = true;
+          }
+          refreshJmriFromWorkspace(ws);
+          if (window.refreshBlockVarOptions) refreshBlockVarOptions(ws);
+          updateStl();
+        });
+      };
+
+      /** Get bounding box of all blocks in workspace. Returns { minX, minY, maxX, maxY } or null. */
+      function getWorkspaceBlockBounds(workspace) {
+        var blocks = workspace.getAllBlocks ? workspace.getAllBlocks(false) : [];
+        if (!blocks.length) return null;
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        var getXY = function (b) {
+          if (b.getRelativeToSurfaceXY) return b.getRelativeToSurfaceXY();
+          return { x: b.x != null ? b.x : 0, y: b.y != null ? b.y : 0 };
+        };
+        var getSize = function (b) {
+          if (b.getHeightWidth) { var hw = b.getHeightWidth(); return { w: hw.width, h: hw.height }; }
+          return { w: 100, h: 40 };
+        };
+        for (var i = 0; i < blocks.length; i++) {
+          var xy = getXY(blocks[i]);
+          var sz = getSize(blocks[i]);
+          if (xy.x < minX) minX = xy.x;
+          if (xy.y < minY) minY = xy.y;
+          if (xy.x + sz.w > maxX) maxX = xy.x + sz.w;
+          if (xy.y + sz.h > maxY) maxY = xy.y + sz.h;
+        }
+        return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+      }
+
+      function escapeXml(s) {
+        if (s == null) return '';
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      }
+
+      /** Create variable blocks from backup JMRI data and place them in a stack to the right of the code. No-op if no config backup. */
+      function addVariableBlocksFromBackup(workspace) {
+        if (!window.stlConfigBackupRaw) return;
+        var inputs = window.stlJmriInputs || [];
+        var outputs = window.stlJmriOutputs || [];
+        var tx = window.stlJmriTransmitters || [];
+        var rx = window.stlJmriReceivers || [];
+        var rows = [];
+        for (var i = 0; i < inputs.length; i++) {
+          var r = inputs[i];
+          if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim())) {
+            rows.push({ kind: 'input', key: r[0], name: String(r[1] || '').trim(), trueId: String(r[2] || '').trim(), falseId: String(r[3] || '').trim() });
+          }
+        }
+        for (var o = 0; o < outputs.length; o++) {
+          var r = outputs[o];
+          if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim())) {
+            rows.push({ kind: 'output', key: r[0], name: String(r[1] || '').trim(), trueId: String(r[2] || '').trim(), falseId: String(r[3] || '').trim() });
+          }
+        }
+        for (var t = 0; t < tx.length; t++) {
+          var r = tx[t];
+          if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim())) {
+            rows.push({ kind: 'tx', key: r[0], name: String(r[1] || '').trim(), eventId: String(r[2] || '').trim() });
+          }
+        }
+        for (var v = 0; v < rx.length; v++) {
+          var r = rx[v];
+          if ((r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim())) {
+            rows.push({ kind: 'rx', key: r[0], name: String(r[1] || '').trim(), eventId: String(r[2] || '').trim() });
+          }
+        }
+        if (!rows.length) return;
+        var bounds = getWorkspaceBlockBounds(workspace);
+        var codeRight = bounds ? bounds.maxX + 1 : 0;
+        var GAP = 180;
+        var varStackX = codeRight + GAP;
+        var startY = bounds ? bounds.minY : 20;
+        var CHAIN_GAP = 20;
+        var xmlns = ' xmlns="https://developers.google.com/blockly/xml"';
+        function rowInnerXml(row, fieldName) {
+          var nameAttr = escapeXml(row.name || '');
+          var keyAttr = escapeXml(row.key);
+          var eventIdXml = '';
+          if (row.kind === 'input' || row.kind === 'output') {
+            if (row.trueId || row.falseId) {
+              eventIdXml = '<value name="RIGHT"><block type="stl_event_id"><field name="TRUE_ID">' + escapeXml(row.trueId || '') + '</field><field name="FALSE_ID">' + escapeXml(row.falseId || '') + '</field></block></value>';
+            }
+          } else if ((row.eventId || '').trim()) {
+            eventIdXml = '<value name="RIGHT"><block type="stl_event_id"><field name="TRUE_ID">' + escapeXml(row.eventId) + '</field><field name="FALSE_ID"></field></block></value>';
+          }
+          return '<field name="' + fieldName + '">' + keyAttr + '</field><field name="NAME">' + nameAttr + '</field>' + eventIdXml;
+        }
+        function getBlockBottom(block) {
+          var xy = block.getRelativeToSurfaceXY ? block.getRelativeToSurfaceXY() : { x: block.x || 0, y: block.y || 0 };
+          var h = (block.getHeightWidth && block.getHeightWidth()) ? block.getHeightWidth().height : 40;
+          return xy.y + h;
+        }
+        var kinds = ['input', 'output', 'tx', 'rx'];
+        var currentY = startY;
+        for (var ki = 0; ki < kinds.length; ki++) {
+          var kind = kinds[ki];
+          var group = rows.filter(function (r) { return r.kind === kind; });
+          if (!group.length) continue;
+          var varType = kind === 'input' ? 'stl_var_input' : kind === 'output' ? 'stl_var_output' : kind === 'tx' ? 'stl_var_transmitter' : 'stl_var_receiver';
+          var fieldName = (kind === 'input' || kind === 'output') ? 'VAR' : 'CIRCUIT';
+          var blockY = Math.round(currentY);
+          var chain = rowInnerXml(group[group.length - 1], fieldName);
+          for (var gi = group.length - 2; gi >= 0; gi--) {
+            chain = rowInnerXml(group[gi], fieldName) + '<next><block type="' + varType + '">' + chain + '</block></next>';
+          }
+          var fullXml = '<xml' + xmlns + '><block type="' + varType + '" x="' + Math.round(varStackX) + '" y="' + blockY + '">' + chain + '</block></xml>';
+          try {
+            var frag = xmlTextToDom(fullXml);
+            if (frag && Blockly.Xml && Blockly.Xml.domToWorkspace) {
+              Blockly.Xml.domToWorkspace(frag, workspace);
+            }
+            var tops = workspace.getTopBlocks ? workspace.getTopBlocks(false) : [];
+            var codeTypes = { stl_var_input: 1, stl_var_output: 1, stl_var_receiver: 1, stl_var_transmitter: 1 };
+            var varTops = tops.filter(function (b) { return b.type && codeTypes[b.type]; });
+            var lastInChain = varTops[varTops.length - 1];
+            if (lastInChain) {
+              while (lastInChain.getNextBlock && lastInChain.getNextBlock()) lastInChain = lastInChain.getNextBlock();
+              currentY = getBlockBottom(lastInChain) + CHAIN_GAP;
+            } else {
+              currentY = blockY + group.length * 32 + CHAIN_GAP;
+            }
+          } catch (err) {
+            currentY = blockY + group.length * 32 + CHAIN_GAP;
+          }
+        }
+      }
+
       function connectImportedStack(workspace) {
         var tops = workspace.getTopBlocks ? workspace.getTopBlocks(false) : [];
+        var codeTypes = { stl_var_input: 1, stl_var_output: 1, stl_var_receiver: 1, stl_var_transmitter: 1, stl_event_id: 1 };
+        tops = tops.filter(function (b) { return b.type && !codeTypes[b.type]; });
         if (tops.length <= 1) return;
         var getY = function (b) {
           var xy = b.getRelativeToSurfaceXY ? b.getRelativeToSurfaceXY() : { y: b.y != null ? b.y : 0 };
@@ -1890,6 +2338,8 @@
       }
 
       updateStl();
+      }
+      loadBlocklyThenInit();
     })();
   </script>
 </body>
