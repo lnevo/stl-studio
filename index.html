@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.15';</script>
+  <script>var APP_VERSION = '1.16';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -1512,9 +1512,8 @@
         var payload = buildSharePayload();
         if (!payload) {
           if (feedbackEl) {
-            var orig = feedbackEl.getAttribute('title');
             feedbackEl.setAttribute('title', 'Workspace is empty');
-            setTimeout(function () { feedbackEl.setAttribute('title', orig || 'Copy share link'); }, 2000);
+            setTimeout(function () { feedbackEl.setAttribute('title', 'Copy share link'); }, 2000);
           }
           return;
         }
@@ -1528,13 +1527,40 @@
         var namesFits = namesEncoded.length > 0 && namesEncoded.length <= SHARE_URL_MAX;
         var stlFits = stlEncoded.length > 0 && stlEncoded.length <= SHARE_URL_MAX;
 
-        if (!fullFits && !namesFits && stlFits) {
+        function hasEventIds(p) {
+          if (!p) return false;
+          function ioHas(r) { return (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim()); }
+          function txRxHas(r) { return r[2] && String(r[2]).trim(); }
+          if (p.i && p.i.some(ioHas)) return true;
+          if (p.o && p.o.some(ioHas)) return true;
+          if (p.t && p.t.some(txRxHas)) return true;
+          if (p.r && p.r.some(txRxHas)) return true;
+          return false;
+        }
+        function hasNames(p) {
+          if (!p) return false;
+          if (p.fn && Object.keys(p.fn).length) return true;
+          function hasName(r) { return r[1] && String(r[1]).trim(); }
+          if (p.i && p.i.some(hasName)) return true;
+          if (p.o && p.o.some(hasName)) return true;
+          if (p.t && p.t.some(hasName)) return true;
+          if (p.r && p.r.some(hasName)) return true;
+          return false;
+        }
+        var showFull = hasEventIds(payload) && fullFits;
+        var showNames = hasNames(payload) && namesFits;
+        var onlyStlOption = !showFull && !showNames && stlFits;
+
+        if (onlyStlOption) {
           var stlUrl = base + '?stl=' + stlEncoded;
           navigator.clipboard.writeText(stlUrl).then(function () {
             if (feedbackEl) {
-              var orig = feedbackEl.getAttribute('title');
-              feedbackEl.setAttribute('title', 'Link copied!');
-              setTimeout(function () { feedbackEl.setAttribute('title', orig || 'Copy share link'); }, 1500);
+              feedbackEl.classList.add('copy-success');
+              if (feedbackEl.id === 'btnShare') {
+                feedbackEl.textContent = 'Copied!';
+                setTimeout(function () { feedbackEl.textContent = 'Share'; }, 1500);
+              }
+              setTimeout(function () { feedbackEl.classList.remove('copy-success'); }, 1500);
             }
           }, function () {
             if (feedbackEl) {
@@ -1561,10 +1587,10 @@
 
         messageModalTitle.textContent = 'Share';
         var limitKb = (SHARE_URL_MAX / 1024).toFixed(1);
-        if (fullFits) {
-          messageModalBody.textContent = 'Choose what to include in the link (limit ~' + limitKb + ' KB).';
+        if (showFull || showNames) {
+          messageModalBody.textContent = fullFits ? 'Choose what to include in the link (limit ~' + limitKb + ' KB).' : 'Full payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Choose an option below.';
         } else {
-          messageModalBody.textContent = 'Full payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Choose an option below.';
+          messageModalBody.textContent = 'Payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Copy link with STL only.';
         }
         messageModalActions.innerHTML = '';
 
@@ -1585,7 +1611,7 @@
         function addNamesOnlyBtn() {
           var btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = fullFits ? '' : 'primary';
+          btn.className = showFull ? '' : 'primary';
           btn.textContent = 'Copy link with names (no event IDs)';
           btn.onclick = function () {
             var url = base + '?d=' + namesEncoded;
@@ -1609,14 +1635,9 @@
           };
           messageModalActions.appendChild(btn);
         }
-        if (fullFits) {
-          addFullBtn();
-          addNamesOnlyBtn();
-          addStlOnlyBtn();
-        } else if (namesFits) {
-          addNamesOnlyBtn();
-          addStlOnlyBtn();
-        }
+        if (showFull) addFullBtn();
+        if (showNames) addNamesOnlyBtn();
+        addStlOnlyBtn();
         var okBtn = document.createElement('button');
         okBtn.type = 'button';
         okBtn.textContent = 'OK';
