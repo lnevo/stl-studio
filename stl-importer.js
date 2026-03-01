@@ -56,14 +56,25 @@
     return null;
   }
 
-  function blockXml(type, fields, nextXml) {
+  function blockXml(type, fields, nextXml, statementName, statementBodyList) {
     var xml = '<block type="' + type + '" x="0" y="0">';
     if (fields) {
       for (var key in fields) xml += '<field name="' + key + '">' + escapeXml(String(fields[key])) + '</field>';
     }
+    if (statementName && statementBodyList && statementBodyList.length > 0) {
+      xml += '<statement name="' + statementName + '">' + chainToXml(statementBodyList) + '</statement>';
+    }
     if (nextXml) xml += '<next>' + nextXml + '</next>';
     xml += '</block>';
     return xml;
+  }
+
+  /** Build XML for a chain of block descriptors (first block with <next> to rest). */
+  function chainToXml(descriptors) {
+    if (descriptors.length === 0) return '';
+    var first = descriptors[0];
+    var nextXml = descriptors.length > 1 ? chainToXml(descriptors.slice(1)) : null;
+    return blockXml(first.type, first.fields, nextXml);
   }
 
   function escapeXml(s) {
@@ -101,11 +112,13 @@
       case 'SET':
         return { type: 'stl_set', fields: {} };
       case 'A':
+        if (arg === '(') return { type: 'stl_and_group_start', fields: {} };
         return validLogicVar(arg) ? { type: 'stl_and', fields: { VAR: normVar(arg) } } : null;
       case 'LD':
         return validLogicVar(arg) ? { type: 'stl_and', fields: { VAR: normVar(arg) } } : null;
       case 'O':
-        if (!arg || arg === '(') return null;
+        if (arg === '(') return { type: 'stl_or_group_start', fields: {} };
+        if (!arg) return null;
         return validLogicVar(arg) ? { type: 'stl_or', fields: { VAR: normVar(arg) } } : null;
       case 'AN':
         return validLogicVar(arg) ? { type: 'stl_and_not', fields: { VAR: normVar(arg) } } : null;
@@ -132,8 +145,11 @@
       case 'FR':
         return validTimer(arg) ? { type: 'stl_fr', fields: { TIMER: normVar(arg) } } : null;
       case 'O(':
+        return { type: 'stl_or_group_start', fields: {} };
+      case 'A(':
+        return { type: 'stl_and_group_start', fields: {} };
       case ')':
-        return null;
+        return { type: 'stl_group_end', fields: {} };
       default:
         if (/^[A-Za-z0-9]{1,4}:$/.test(op)) {
           return { type: 'stl_label', fields: { LABEL: op.slice(0, -1).slice(0, 4) } };
@@ -174,12 +190,34 @@
     var list = [];
     var rest = raw;
     var triedCompact = false;
+    var groupDepth = 0;
 
     while (rest.length > 0) {
       rest = rest.replace(/^\s+/, '');
       if (rest.length === 0) break;
 
       var m;
+      if (groupDepth > 0 && rest.charAt(0) === ')') {
+        list.push({ type: 'stl_group_end', fields: {} });
+        groupDepth--;
+        rest = rest.slice(1);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = /^O\s*\(/.exec(rest))) {
+        list.push({ type: 'stl_or_group_start', fields: {} });
+        groupDepth++;
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = /^A\s*\(/.exec(rest))) {
+        list.push({ type: 'stl_and_group_start', fields: {} });
+        groupDepth++;
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
       if ((m = /^CLR/i.exec(rest))) {
         list.push({ type: 'stl_clear', fields: {} });
         rest = rest.slice(m[0].length);
@@ -276,19 +314,19 @@
         triedCompact = true;
         continue;
       }
-      if ((m = new RegExp('^JC(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+      if ((m = new RegExp('^JC' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_jc', fields: { LABEL: m[1].slice(0, 4) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
-      if ((m = new RegExp('^JCN(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+      if ((m = new RegExp('^JCN' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_jcn', fields: { LABEL: m[1].slice(0, 4) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
-      if ((m = new RegExp('^JU(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+      if ((m = new RegExp('^JU' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_ju', fields: { LABEL: m[1].slice(0, 4) } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
@@ -329,16 +367,62 @@
   }
 
   /**
+   * Merge JC/JCN/JU + optional body + matching label into a single C-shaped block descriptor.
+   * Only merges when the matching label appears *after* the jump (we scan forward).
+   * If the label appears before the jump (e.g. E1: ... JC E1 loop-back), we leave separate
+   * JC and Label blocks so the C-shaped block is only used for the "jump → body → label" pattern.
+   */
+  function mergeJumpLabel(list) {
+    var result = [];
+    var i = 0;
+    while (i < list.length) {
+      var item = list[i];
+      if (item.type === 'stl_jc' || item.type === 'stl_jcn' || item.type === 'stl_ju') {
+        var label = (item.fields && item.fields.LABEL) ? String(item.fields.LABEL).trim().slice(0, 4) : 'E1';
+        var body = [];
+        var j = i + 1;
+        while (j < list.length) {
+          var nextItem = list[j];
+          if (nextItem.type === 'stl_label' && nextItem.fields && String(nextItem.fields.LABEL).trim().slice(0, 4) === label) {
+            var cType = item.type === 'stl_jc' ? 'stl_jump_c_jc' : item.type === 'stl_jcn' ? 'stl_jump_c_jcn' : 'stl_jump_c_ju';
+            result.push({ type: cType, fields: { LABEL: label }, body: body });
+            i = j + 1;
+            break;
+          }
+          if (nextItem.type === 'stl_jc' || nextItem.type === 'stl_jcn' || nextItem.type === 'stl_ju' || nextItem.type === 'stl_label') {
+            result.push(item);
+            i++;
+            break;
+          }
+          body.push(nextItem);
+          j++;
+        }
+        if (j >= list.length) {
+          result.push(item);
+          i++;
+        }
+      } else {
+        result.push(item);
+        i++;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Build Blockly XML from a list of block descriptors (one stack).
-   * Flat list of sibling blocks (no <next> nesting) so domToWorkspace doesn't throw "Block has parent";
-   * the app connects them after load.
+   * Descriptors may have .body (array) for C-shaped jump blocks; then we emit <statement name="BODY">.
    */
   var FLAT_BLOCK_SPACING = 50;
   function buildXml(list) {
     if (list.length === 0) return '';
+    var merged = mergeJumpLabel(list);
     var parts = [];
-    for (var i = 0; i < list.length; i++) {
-      parts.push(blockXml(list[i].type, list[i].fields, null));
+    for (var i = 0; i < merged.length; i++) {
+      var item = merged[i];
+      var stmtName = item.body !== undefined ? 'BODY' : null;
+      var stmtList = item.body;
+      parts.push(blockXml(item.type, item.fields, null, stmtName, stmtList));
     }
     var xml = '<xml xmlns="https://developers.google.com/blockly/xml">';
     for (var j = 0; j < parts.length; j++) {

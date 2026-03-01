@@ -4,7 +4,7 @@
 
 A visual editor that generates **STL (Statement List)** code for the [Tower LCC+Q](https://www.rr-cirkits.com/) device (RR-CirKits 16 I/O LCC node with built-in PLC-style logic). Build logic by snapping pieces together; export the STL and copy it into your node via **Configure Nodes**.
 
-![STL Studio](screenshot.png?v=2)
+![STL Studio](screenshot.png)
 
 ## Why
 

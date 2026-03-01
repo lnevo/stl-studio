@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.0';</script>
+  <script>var APP_VERSION = '1.5';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -117,12 +117,30 @@
       fill: #1a1d23 !important;
     }
     #stlPanel {
-      width: 360px;
-      max-width: 100%;
+      width: var(--stl-panel-width, 360px);
+      min-width: 280px;
+      max-width: 90vw;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       border-left: 1px solid var(--border);
       background: var(--panel-bg);
+    }
+    .stl-panel-resizer {
+      width: 6px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: var(--border);
+      position: relative;
+    }
+    .stl-panel-resizer:hover,
+    .stl-panel-resizer:active { background: var(--accent); }
+    .stl-panel-resizer::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 14px;
+      margin-left: -4px;
     }
     #stlPanel h2 {
       margin: 0;
@@ -130,8 +148,10 @@
       font-size: 0.9rem;
       font-weight: 600;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
     .stl-format-row {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -151,6 +171,7 @@
       color: var(--text);
     }
     .stl-byte-count {
+      flex-shrink: 0;
       font-size: 0.75rem;
       color: var(--muted);
       padding: 0.25rem 1rem;
@@ -159,14 +180,18 @@
     .stl-byte-count.warning {
       color: #f59e0b;
     }
-    #stlOutput {
+    #stlOutput, .stl-split-container {
       flex: 1;
       margin: 0;
-      padding: 1rem;
+      padding: 0;
       overflow: auto;
       font-size: 0.85rem;
       line-height: 1.5;
       white-space: pre;
+      min-height: 0;
+    }
+    #stlOutput {
+      padding: 1rem;
       resize: none;
       border: none;
       background: transparent;
@@ -174,14 +199,26 @@
       outline: none;
     }
     #stlOutput::placeholder { color: var(--muted); }
-    .help {
-      padding: 0.75rem 1rem;
+    .stl-split-container {
+      display: flex;
+      flex-direction: column;
       border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.4;
+      overflow: hidden;
     }
-    .help a { color: var(--accent); }
+    .stl-split-container .stl-pane {
+      padding: 1rem;
+      overflow: auto;
+      min-height: 0;
+      flex: 1 1 0;
+    }
+    .stl-split-container .stl-raw-pane {
+      border-bottom: 1px solid var(--border);
+      color: var(--green);
+    }
+    .stl-split-container .stl-expanded-pane {
+      color: var(--green);
+      font-size: 0.85rem;
+    }
     /* Import modal */
     .modal-overlay {
       display: none;
@@ -236,6 +273,7 @@
       max-height: 50vh;
     }
     .logic-string-modal .modal-body-text p { margin: 0 0 0.75rem; }
+    .logic-string-modal .modal-body-text a { color: var(--accent); }
     .logic-string-modal .modal-body-text code { color: var(--accent); }
     @media (max-width: 768px) {
       main { flex-direction: column; }
@@ -255,17 +293,18 @@
       </a>
     </div>
     <div class="header-actions">
-      <button type="button" id="btnGenerate" class="primary">Generate STL</button>
-      <button type="button" id="btnCopy">Copy to clipboard</button>
+      <button type="button" id="btnCopy" class="primary">Copy to clipboard</button>
       <button type="button" id="btnDownload">Download STL</button>
       <button type="button" id="btnDownloadCsv">Download CSV</button>
       <button type="button" id="btnImport">Import STL…</button>
       <button type="button" id="btnExample">Load example</button>
       <button type="button" id="btnLogicStringHelp" title="How the blocks work together">How do the blocks work?</button>
+      <button type="button" id="btnInputsRef" title="Quick help and reference">Help</button>
     </div>
   </header>
   <main>
     <div id="blocklyDiv"></div>
+    <div id="stlPanelResizer" class="stl-panel-resizer" role="separator" aria-label="Drag to resize Generated STL column"></div>
     <aside id="stlPanel">
       <h2>Generated STL</h2>
       <div class="stl-format-row">
@@ -277,10 +316,13 @@
         </select>
       </div>
       <div id="stlByteCount" class="stl-byte-count" aria-live="polite"></div>
-      <pre id="stlOutput" aria-label="Generated STL code">// Drag blocks from the left, then click "Generate STL".</pre>
-      <div class="help">
-        Inputs: I0.0–I15.7 · Outputs: Q0.0–Q15.7 · Logic runs every 20 ms. Copy to node via <strong>Configure Nodes</strong>. Labels: 1–4 chars + colon (e.g. E1:). Avoid T0–T63 in comments (reserved for timers).
-        <a href="https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml" target="_blank" rel="noopener">JMRI STL Editor</a> (reference)
+      <div class="stl-format-row">
+        <label><input type="checkbox" id="stlSplitView" aria-label="Show split view: raw code and expanded explanation"> Split view (raw + expanded)</label>
+      </div>
+      <pre id="stlOutput" aria-label="Generated STL code">// Drag blocks from the left; the code updates as you edit. Use Copy or Download to use it.</pre>
+      <div id="stlSplitContainer" class="stl-split-container" style="display: none;" aria-label="Split view: raw STL on top, raw with explanations as comments on bottom">
+        <pre id="stlRawPane" class="stl-pane stl-raw-pane" aria-label="Raw STL"></pre>
+        <pre id="stlExpandedPane" class="stl-pane stl-expanded-pane" aria-label="Raw STL with expanded explanations as comments"></pre>
       </div>
     </aside>
   </main>
@@ -295,6 +337,21 @@
       <div class="modal-actions">
         <button type="button" id="importCancel">Cancel</button>
         <button type="button" id="importApply" class="primary">Import into workspace</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="helpRefModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal logic-string-modal" role="dialog" aria-labelledby="helpRefModalTitle">
+      <h3 id="helpRefModalTitle">Help</h3>
+      <div class="modal-body-text">
+        <p><strong>STL Studio</strong> builds logic programs for the Tower LCC+Q. Drag blocks from the left into the workspace; the generated code updates as you edit.</p>
+        <p>Use <strong>Copy to clipboard</strong> to copy the STL, then paste it into your node (e.g. via <strong>Configure Nodes</strong> in your layout software). Use <strong>Download STL</strong> to save a file, or <strong>Import STL…</strong> to load existing code or a Tower config backup.</p>
+        <p>Inputs are I0.0–I15.7, outputs Q0.0–Q15.7. Labels: 1–4 characters plus a colon (e.g. E1:). Importing a Tower config backup fills block dropdowns with <strong>friendly names</strong> (sensor/output descriptions) when available.</p>
+        <p><a href="https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml" target="_blank" rel="noopener">JMRI STL Editor</a> (syntax reference)</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="helpRefClose" class="primary">Close</button>
       </div>
     </div>
   </div>
@@ -335,7 +392,7 @@
   <script>
     (function () {
       (function setVersion() {
-        var v = window.APP_VERSION || '1.0';
+        var v = window.APP_VERSION || '1.5';
         document.title = 'STL Studio ' + v;
         var el = document.getElementById('appVersion');
         if (el) el.textContent = v;
@@ -369,7 +426,7 @@
           },
           {
             kind: 'category',
-            name: 'Timer / Load',
+            name: 'Timers',
             colour: '#6b2d8e',
             contents: [
               { kind: 'block', type: 'stl_l_time' },
@@ -379,13 +436,26 @@
           },
           {
             kind: 'category',
-            name: 'Jumps & labels',
+            name: 'Jumps',
             colour: '#006b9e',
             contents: [
-              { kind: 'block', type: 'stl_label' },
+              { kind: 'block', type: 'stl_jump_c_jc' },
+              { kind: 'block', type: 'stl_jump_c_jcn' },
+              { kind: 'block', type: 'stl_jump_c_ju' },
               { kind: 'block', type: 'stl_jc' },
               { kind: 'block', type: 'stl_jcn' },
-              { kind: 'block', type: 'stl_ju' }
+              { kind: 'block', type: 'stl_ju' },
+              { kind: 'block', type: 'stl_label' }
+            ]
+          },
+          {
+            kind: 'category',
+            name: 'Nesting',
+            colour: '#5c7e00',
+            contents: [
+              { kind: 'block', type: 'stl_or_group_start' },
+              { kind: 'block', type: 'stl_and_group_start' },
+              { kind: 'block', type: 'stl_group_end' }
             ]
           },
           {
@@ -407,7 +477,7 @@
         trashcan: true
       });
       if (Blockly.Tooltip && typeof Blockly.Tooltip.HOVER_MS !== 'undefined') {
-        Blockly.Tooltip.HOVER_MS = 20;
+        Blockly.Tooltip.HOVER_MS = 5;
       }
 
       function applyToolboxDarkText() {
@@ -431,6 +501,10 @@
       var stlOutput = document.getElementById('stlOutput');
       var stlFormatSelect = document.getElementById('stlFormat');
       var stlByteCountEl = document.getElementById('stlByteCount');
+      var stlSplitView = document.getElementById('stlSplitView');
+      var stlSplitContainer = document.getElementById('stlSplitContainer');
+      var stlRawPane = document.getElementById('stlRawPane');
+      var stlExpandedPane = document.getElementById('stlExpandedPane');
       var lastCode = '';
       var BYTES_PER_GROUP = 255;
 
@@ -486,6 +560,98 @@
         return formatStl(lastCode, stlFormatSelect ? stlFormatSelect.value : 'readable');
       }
 
+      /** Format STL text with line numbers for the raw pane (e.g. "   1 | CLR"). */
+      function formatStlWithLineNumbers(stlText) {
+        if (!stlText || !stlText.trim()) return '';
+        var lines = stlText.split('\n');
+        var maxW = String(lines.length).length;
+        return lines.map(function (line, i) {
+          var n = (i + 1);
+          var pad = ('' + n).padStart(Math.max(2, maxW));
+          return ' ' + pad + ' | ' + line;
+        }).join('\n');
+      }
+
+      /** Map one raw STL line to an expanded description (block-style text). Optional friendly names appended. */
+      function describeStlLine(line) {
+        var raw = line.trim();
+        var commentIdx = raw.indexOf('//');
+        var comment = '';
+        if (commentIdx >= 0) {
+          comment = raw.slice(commentIdx + 2).trim();
+          raw = raw.slice(0, commentIdx).trim();
+        }
+        var names = (window.stlFriendlyNames && typeof window.stlFriendlyNames === 'object') ? window.stlFriendlyNames : {};
+        function friendly(varName) {
+          return names[varName] ? '  — ' + varName + ' – ' + names[varName] : '';
+        }
+        if (!raw && comment) {
+          if (/^Group \d+:/.test(comment)) return '[Group] Group Description: ' + comment.replace(/^Group \d+:\s*/, '');
+          return '[//] Note (comment): ' + comment;
+        }
+        if (!raw) return '';
+        var parts = raw.split(/\s+/);
+        var op = (parts[0] || '').toUpperCase();
+        var arg = parts[1] || '';
+        switch (op) {
+          case 'CLR': return '[CLR] Clear the current result (start fresh)';
+          case 'SET': return '[SET] Set the current result to ON';
+          case 'A':
+            if (arg === '(') return '[A(] AND group start ( … )';
+            return '[A] Check that ' + arg + ' is ON (AND)' + friendly(arg);
+          case 'O':
+            if (arg === '(') return '[O(] OR group start ( … )';
+            return '[O] Check that ' + arg + ' is ON (OR)' + friendly(arg);
+          case 'AN': return '[AN] Check that ' + arg + ' is OFF (AND NOT)' + friendly(arg);
+          case 'ON': return '[ON] Check that ' + arg + ' is OFF (OR NOT)' + friendly(arg);
+          case 'NOT': return '[NOT] Invert the result';
+          case '=': return '[=] Set ' + arg + ' to result (ON or OFF)' + friendly(arg);
+          case 'S': return '[S] Turn ON (latch) ' + arg + friendly(arg);
+          case 'R': return '[R] Turn OFF or reset ' + arg + friendly(arg);
+          case ')': return '[)] Group end';
+          case 'JC': return '[JC] If result is ON, jump to ' + (arg || '?');
+          case 'JCN': return '[JCN] If result is OFF, jump to ' + (arg || '?');
+          case 'JU': return '[JU] Jump to ' + (arg || '?') + ' (always)';
+          case 'SD': return '[SD] Start timer ' + arg + ' (delay)';
+          case 'FR': return '[FR] Enable timer ' + arg + ' to run';
+          case 'L': return '[L] Load time ' + (raw.slice(1).trim() || '…');
+          default:
+            if (/^[A-Za-z0-9]{1,4}:$/.test(op)) return '[label:] Label (jump target): ' + op.slice(0, -1);
+            if (raw.slice(-1) === ':' && /^[A-Za-z0-9]{1,4}:$/.test(raw.trim())) return '[label:] Label (jump target): ' + raw.trim().slice(0, -1);
+            if (comment) return '[//] Note (comment): ' + comment;
+            return raw;
+        }
+      }
+
+      /** Build expanded-view text (one description per raw line, with line numbers). */
+      function stlToExpandedDescriptions(stlText) {
+        if (!stlText || !stlText.trim()) return '';
+        var lines = stlText.split('\n');
+        var maxW = String(lines.length).length;
+        var out = [];
+        for (var i = 0; i < lines.length; i++) {
+          var desc = describeStlLine(lines[i]);
+          if (desc === '' && !lines[i].trim()) { out.push(''); continue; }
+          var pad = ('' + (i + 1)).padStart(Math.max(2, maxW));
+          out.push(' ' + pad + '  ' + (desc || lines[i]));
+        }
+        return out.join('\n');
+      }
+
+      /** Raw STL with expanded description as a comment after each line (for bottom pane; no line numbers). */
+      function formatStlRawWithDescriptionComments(stlText) {
+        if (!stlText || !stlText.trim()) return '';
+        var lines = stlText.split('\n');
+        var out = [];
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          out.push(line);
+          var desc = describeStlLine(line);
+          if (desc) out.push('// ' + desc);
+        }
+        return out.join('\n');
+      }
+
       function xmlTextToDom(xmlString) {
         if (Blockly.utils && Blockly.utils.xml && typeof Blockly.utils.xml.textToDom === 'function') {
           return Blockly.utils.xml.textToDom(xmlString);
@@ -496,25 +662,109 @@
         throw new Error('Blockly XML parser not found (tried utils.xml.textToDom and Xml.textToDom)');
       }
 
+      function refreshStlDisplay(optionalContent) {
+        var splitOn = stlSplitView && stlSplitView.checked;
+        var formatted = optionalContent != null ? optionalContent : (splitOn ? (formatStl(lastCode, 'readable') || '// No blocks — add blocks from the left; code updates as you edit.') : (getFormattedStl() || '// No blocks — add blocks from the left; code updates as you edit.'));
+        if (stlOutput) stlOutput.style.display = splitOn ? 'none' : '';
+        if (stlSplitContainer) {
+          if (splitOn) {
+            stlSplitContainer.style.display = 'flex';
+            stlSplitContainer.style.height = '';
+          } else {
+            stlSplitContainer.style.display = 'none';
+            stlSplitContainer.style.height = '';
+          }
+        }
+        if (splitOn && stlRawPane && stlExpandedPane) {
+          stlRawPane.textContent = formatted;
+          stlExpandedPane.textContent = formatStlRawWithDescriptionComments(formatted);
+          requestAnimationFrame(function () {
+            if (!stlSplitContainer || !stlSplitView || !stlSplitView.checked) return;
+            var available = stlSplitContainer.offsetHeight;
+            var contentH = Math.max(stlRawPane.scrollHeight, stlExpandedPane.scrollHeight);
+            var h = Math.min(contentH, available);
+            stlSplitContainer.style.height = Math.max(80, h) + 'px';
+          });
+        } else if (stlOutput) {
+          stlOutput.textContent = formatted;
+        }
+      }
+
+      function syncJumpCLabelDisplays(workspace) {
+        if (!workspace || !workspace.getAllBlocks) return;
+        var blocks = workspace.getAllBlocks(false);
+        for (var i = 0; i < blocks.length; i++) {
+          var block = blocks[i];
+          var type = block.type || '';
+          if (type !== 'stl_jump_c_jc' && type !== 'stl_jump_c_jcn' && type !== 'stl_jump_c_ju') continue;
+          var labelVal = block.getFieldValue('LABEL');
+          if (labelVal != null && block.getField('LABEL_DISPLAY')) block.setFieldValue(String(labelVal).trim().slice(0, 4) || 'E1', 'LABEL_DISPLAY');
+        }
+      }
+
       function updateStl() {
+        syncJumpCLabelDisplays(ws);
         try {
+          if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length && window.getStlLogicVarOptions) refreshBlockVarOptions(ws);
           if (window.stlGenerator) window.stlGenerator.groupIndex = 0;
           lastCode = window.stlGenerator ? window.stlGenerator.workspaceToCode(ws) : '';
         } catch (e) {
           lastCode = '// Error: ' + (e.message || String(e));
         }
-        stlOutput.textContent = getFormattedStl() || '// No blocks — add blocks and click Generate STL.';
+        refreshStlDisplay();
         updateByteCount();
       }
 
-      if (stlFormatSelect) {
-        stlFormatSelect.addEventListener('change', function () {
-          stlOutput.textContent = getFormattedStl() || stlOutput.textContent;
-          updateByteCount();
-        });
-      }
+        if (stlFormatSelect) {
+          stlFormatSelect.addEventListener('change', function () {
+            refreshStlDisplay();
+            updateByteCount();
+          });
+        }
+        if (stlSplitView && stlFormatSelect) {
+          stlSplitView.addEventListener('change', function () {
+            if (stlSplitView.checked) {
+              stlFormatSelect.value = 'readable';
+              stlFormatSelect.disabled = true;
+            } else {
+              stlFormatSelect.disabled = false;
+            }
+            refreshStlDisplay();
+            updateByteCount();
+          });
+        } else if (stlSplitView) {
+          stlSplitView.addEventListener('change', function () { refreshStlDisplay(); });
+        }
+        var stlPanelResizer = document.getElementById('stlPanelResizer');
+        var stlPanel = document.getElementById('stlPanel');
+        if (stlPanelResizer && stlPanel) {
+          stlPanelResizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            var panelRect = stlPanel.getBoundingClientRect();
+            var startRight = panelRect.right;
+            var minW = 280;
+            var maxW = Math.max(minW, Math.min(900, window.innerWidth * 0.9));
+            function move(e) {
+              var w = startRight - e.clientX;
+              w = Math.max(minW, Math.min(maxW, w));
+              stlPanel.style.setProperty('--stl-panel-width', w + 'px');
+              if (typeof Blockly !== 'undefined' && ws) Blockly.svgResize(ws);
+            }
+            function stop() {
+              document.removeEventListener('mousemove', move);
+              document.removeEventListener('mouseup', stop);
+              document.body.style.cursor = '';
+              document.body.style.userSelect = '';
+              if (typeof Blockly !== 'undefined' && ws) Blockly.svgResize(ws);
+            }
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', stop);
+          });
+        }
+        refreshStlDisplay();
 
-      document.getElementById('btnGenerate').onclick = updateStl;
       var changeTimeout;
       ws.addChangeListener(function () {
         clearTimeout(changeTimeout);
@@ -526,8 +776,8 @@
         var toCopy = getFormattedStl();
         if (!toCopy) return;
         navigator.clipboard.writeText(toCopy).then(
-          function () { stlOutput.textContent = '// Copied to clipboard.\n\n' + toCopy; },
-          function () { stlOutput.textContent = '// Copy failed.\n\n' + toCopy; }
+          function () { refreshStlDisplay('// Copied to clipboard.\n\n' + toCopy); },
+          function () { refreshStlDisplay('// Copy failed.\n\n' + toCopy); }
         );
       };
 
@@ -674,6 +924,53 @@
       function isConfigBackup(text) {
         var t = (text || '').trim();
         return t.length > 100 && /Conditionals\.Logic\(\d+\)\.MultiLine=/m.test(t);
+      }
+
+      /** Parse config backup for Logic Inputs/Outputs descriptions. Returns map e.g. { "I0.0": "East Local", "Q0.0": "East Out" }. */
+      function parseConfigFriendlyNames(configText) {
+        var map = {};
+        var lines = (configText || '').split(/\r?\n/);
+        var inputRe = /^Logic Inputs\.Group I(\d+)\((\d+)\)\.Input Description=(.*)$/;
+        var outputRe = /^Logic Outputs\.Group Q(\d+)\((\d+)\)\.Output Description=(.*)$/;
+        for (var i = 0; i < lines.length; i++) {
+          var m = inputRe.exec(lines[i]);
+          if (m) {
+            var key = 'I' + m[1] + '.' + m[2];
+            var desc = (m[3] || '').trim();
+            if (desc) map[key] = desc;
+            continue;
+          }
+          m = outputRe.exec(lines[i]);
+          if (m) {
+            var qKey = 'Q' + m[1] + '.' + m[2];
+            var qDesc = (m[3] || '').trim();
+            if (qDesc) map[qKey] = qDesc;
+          }
+        }
+        return map;
+      }
+
+      /** After loading friendly names (config backup), refresh VAR dropdowns so blocks show "I0.0 – Description". */
+      function refreshBlockVarOptions(workspace) {
+        if (!workspace || !window.getStlLogicVarOptions) return;
+        var logicTypes = ['stl_and', 'stl_or', 'stl_and_not', 'stl_or_not'];
+        var assignTypes = ['stl_assign'];
+        var sTypes = ['stl_s'];
+        var rTypes = ['stl_r'];
+        var allBlocks = workspace.getAllBlocks(false);
+        for (var i = 0; i < allBlocks.length; i++) {
+          var block = allBlocks[i];
+          var field = block.getField && block.getField('VAR');
+          if (!field || !field.setOptions) continue;
+          var type = block.type;
+          var opts;
+          if (logicTypes.indexOf(type) >= 0) opts = window.getStlLogicVarOptions();
+          else if (assignTypes.indexOf(type) >= 0) opts = window.getStlAssignVarOptions();
+          else if (sTypes.indexOf(type) >= 0) opts = window.getStlSVarOptions();
+          else if (rTypes.indexOf(type) >= 0) opts = window.getStlRVarOptions();
+          else continue;
+          field.setOptions(opts);
+        }
       }
 
       /** Decode hex escapes in config MultiLine value: \x003d -> =, \x000a -> newline. */
@@ -893,12 +1190,14 @@
 
       document.getElementById('importApply').onclick = function () {
         var text = importText.value;
+        var rawPaste = text;
         if (!window.stlImporter) {
           importError.textContent = 'Importer not loaded.';
           importError.style.display = 'block';
           return;
         }
         if (isConfigBackup(text)) {
+          window.stlFriendlyNames = parseConfigFriendlyNames(rawPaste);
           var stl = configBackupToStl(text);
           if (stl) text = stl;
           else {
@@ -933,6 +1232,7 @@
           var xmlDom = xmlTextToDom(result.xml);
           ws.clear();
           Blockly.Xml.domToWorkspace(xmlDom, ws);
+          if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length) refreshBlockVarOptions(ws);
           closeImportModal();
           var runConnect = function () {
             connectImportedStack(ws);
@@ -962,6 +1262,19 @@
       document.getElementById('logicStringClose').onclick = closeLogicStringModal;
       logicStringModal.onclick = function (e) {
         if (e.target === logicStringModal) closeLogicStringModal();
+      };
+      var helpRefModal = document.getElementById('helpRefModal');
+      document.getElementById('btnInputsRef').onclick = function () {
+        helpRefModal.classList.add('visible');
+        helpRefModal.setAttribute('aria-hidden', 'false');
+      };
+      function closeHelpRefModal() {
+        helpRefModal.classList.remove('visible');
+        helpRefModal.setAttribute('aria-hidden', 'true');
+      }
+      document.getElementById('helpRefClose').onclick = closeHelpRefModal;
+      helpRefModal.onclick = function (e) {
+        if (e.target === helpRefModal) closeHelpRefModal();
       };
 
       document.getElementById('btnExample').onclick = function () {

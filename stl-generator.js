@@ -101,6 +101,30 @@
     var label = sanitizeLabel(block.getFieldValue('LABEL'));
     return withNext(block, gen, 'JU ' + label + '\n');
   };
+  stlGenerator.forBlock['stl_jump_c_jc'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    var out = 'JC ' + label + '\n';
+    if (bodyCode) out += bodyCode;
+    out += label + ':\n';
+    return withNext(block, gen, out);
+  };
+  stlGenerator.forBlock['stl_jump_c_jcn'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    var out = 'JCN ' + label + '\n';
+    if (bodyCode) out += bodyCode;
+    out += label + ':\n';
+    return withNext(block, gen, out);
+  };
+  stlGenerator.forBlock['stl_jump_c_ju'] = function (block, gen) {
+    var label = sanitizeLabel(block.getFieldValue('LABEL'));
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    var out = 'JU ' + label + '\n';
+    if (bodyCode) out += bodyCode;
+    out += label + ':\n';
+    return withNext(block, gen, out);
+  };
   stlGenerator.forBlock['stl_comment'] = function (block, gen) {
     var text = (block.getFieldValue('TEXT') || '').trim();
     var line = text ? '// ' + text + '\n' : '';
@@ -111,6 +135,15 @@
     var n = typeof gen.groupIndex === 'number' ? gen.groupIndex : 0;
     gen.groupIndex = n + 1;
     return withNext(block, gen, '// Group ' + n + ': ' + name + '\n');
+  };
+  stlGenerator.forBlock['stl_or_group_start'] = function (block, gen) {
+    return withNext(block, gen, 'O(\n');
+  };
+  stlGenerator.forBlock['stl_and_group_start'] = function (block, gen) {
+    return withNext(block, gen, 'A(\n');
+  };
+  stlGenerator.forBlock['stl_group_end'] = function (block, gen) {
+    return withNext(block, gen, ')\n');
   };
 
   global.stlGenerator = stlGenerator;
