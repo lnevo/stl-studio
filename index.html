@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.42';</script>
+  <script>var APP_VERSION = '1.43';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -431,6 +431,19 @@
       padding: 0 1rem 1rem;
       justify-content: flex-end;
     }
+    .import-options-row {
+      margin: 0 1rem 0.75rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .import-options-row input[type="checkbox"] {
+      width: 0.95rem;
+      height: 0.95rem;
+      accent-color: var(--accent);
+    }
     .modal .import-error { color: #f87171; font-size: 0.8rem; margin: 0 1rem 0.5rem; }
     .var-search-modal { max-width: 560px; }
     .var-search-row { margin: 0.75rem 1rem 0.5rem; }
@@ -694,6 +707,7 @@
         <input type="file" id="importFileInput" accept=".txt,.csv,text/*" style="display:none" aria-label="Select file to import">
       </div>
       <textarea id="importStlText" placeholder="Paste STL, config.NODEID….txt backup, group_logic.csv, or R1 AND (R2 OR R3)"></textarea>
+      <label class="import-options-row"><input type="checkbox" id="importClearFirst" checked> Clear workspace before import</label>
       <div class="modal-actions">
         <button type="button" id="btnExample">Load example</button>
         <button type="button" id="importCancel">Cancel</button>
@@ -2235,11 +2249,13 @@
       var importModal = document.getElementById('importModal');
       var importText = document.getElementById('importStlText');
       var importError = document.getElementById('importError');
+      var importClearFirst = document.getElementById('importClearFirst');
 
       document.getElementById('btnImport').onclick = function () {
         importError.style.display = 'none';
         importText.value = '';
         document.getElementById('importFileInput').value = '';
+        if (importClearFirst) importClearFirst.checked = true;
         importModal.classList.add('visible');
         importModal.setAttribute('aria-hidden', 'false');
         importText.focus();
@@ -2741,14 +2757,14 @@
         return stlLines.length ? stlLines.join('\n') : null;
       }
 
-      /** Detect logic expression format: R1 AND (R2 OR R3) with Rn, AND, OR, parens. */
+      /** Detect logic-expression shorthand: R1 AND (R2 OR R3). */
       function isLogicExpression(text) {
         var t = (text || '').trim();
         if (!t || t.length > 10000) return false;
         return /R\d+\s*(AND|OR)|(AND|OR)\s*(\(|R\d)/i.test(t) && /^(R\d+|\s|AND|OR|\(|\))+$/i.test(t.replace(/\s+/g, ' '));
       }
 
-      /** Map R1..R22 etc to I0.0, I0.1, ... (Tower LCC input style). */
+      /** Map R1..Rn to I byte/bit (R1->I0.0, R9->I1.0). */
       function rNameToVar(name) {
         var m = /^R(\d+)$/i.exec((name || '').trim());
         if (!m) return null;
@@ -2760,7 +2776,7 @@
         return 'I' + byte + '.' + bit;
       }
 
-      /** Parse logic expression into STL. Returns STL string or null on error. */
+      /** Parse R-token expression into nested STL (A/O with A(/O() groups). */
       function logicExpressionToStl(text) {
         var s = (text || '').trim().replace(/\s+/g, ' ');
         var tokens = [];
@@ -2823,34 +2839,70 @@
         }
         var ast = parseExpr();
         if (!ast || pos !== tokens.length) return null;
-        var stlLines = [];
-        var nextTemp = 0;
-        function emitNode(n) {
-          if (n.type === 'ID') { stlLines.push('A ' + n.var); return; }
+
+        function normalizeAst(n) {
+          if (!n || n.type === 'ID') return n;
           if (n.type === 'AND') {
-            for (var t = 0; t < n.terms.length; t++) {
-              if (n.terms[t].type === 'ID') stlLines.push('A ' + n.terms[t].var);
-              else emitNode(n.terms[t]);
+            var andTerms = [];
+            for (var ai = 0; ai < n.terms.length; ai++) {
+              var child = normalizeAst(n.terms[ai]);
+              if (child && child.type === 'AND') andTerms = andTerms.concat(child.terms);
+              else if (child) andTerms.push(child);
             }
-            return;
+            return andTerms.length === 1 ? andTerms[0] : { type: 'AND', terms: andTerms };
           }
           if (n.type === 'OR') {
-            emitNode(n.left);
-            var temp = 'M' + Math.floor(nextTemp / 8) + '.' + (nextTemp % 8);
-            nextTemp++;
-            stlLines.push('= ' + temp);
-            emitNode(n.right);
-            stlLines.push('O ' + temp);
+            var orTerms = [];
+            (function collectOr(node) {
+              if (!node) return;
+              if (node.type === 'OR' && Array.isArray(node.terms)) {
+                for (var oi = 0; oi < node.terms.length; oi++) collectOr(node.terms[oi]);
+              } else if (node.type === 'OR') {
+                collectOr(node.left);
+                collectOr(node.right);
+              } else {
+                var child = normalizeAst(node);
+                if (!child) return;
+                orTerms.push(child);
+              }
+            })(n);
+            return orTerms.length === 1 ? orTerms[0] : { type: 'OR', terms: orTerms };
+          }
+          return n;
+        }
+        ast = normalizeAst(ast);
+
+        var stlLines = [];
+        function emitTermList(terms, op) {
+          for (var ti = 0; ti < terms.length; ti++) emitTermWithOp(terms[ti], op);
+        }
+        function emitExprBody(n) {
+          if (!n) return;
+          if (n.type === 'ID') { stlLines.push('A ' + n.var); return; }
+          if (n.type === 'AND') { emitTermList(n.terms, 'A'); return; }
+          if (n.type === 'OR') {
+            var terms = Array.isArray(n.terms) ? n.terms : [n.left, n.right];
+            if (!terms.length) return;
+            emitTermWithOp(terms[0], 'A');
+            for (var oi = 1; oi < terms.length; oi++) emitTermWithOp(terms[oi], 'O');
           }
         }
-        emitNode(ast);
-        stlLines.push('= Q0.0');
+        function emitTermWithOp(n, op) {
+          if (!n) return;
+          if (n.type === 'ID') { stlLines.push(op + ' ' + n.var); return; }
+          if (op === 'A' && n.type === 'AND') { emitTermList(n.terms, 'A'); return; }
+          stlLines.push(op + '(');
+          emitExprBody(n);
+          stlLines.push(')');
+        }
+        emitExprBody(ast);
         return stlLines.join('\n');
       }
 
       document.getElementById('importApply').onclick = function () {
         var text = importText.value;
         var rawPaste = text;
+        var clearBeforeImport = !importClearFirst || !!importClearFirst.checked;
         if (!window.stlImporter) {
           importError.textContent = 'Importer not loaded.';
           importError.style.display = 'block';
@@ -2876,6 +2928,7 @@
           window.stlJmriOutputs = null;
           window.stlJmriTransmitters = null;
           window.stlJmriReceivers = null;
+          window.stlFriendlyNames = {};
         }
         if (isGroupLogicCsv(text)) {
           var stl = groupLogicCsvToStl(text);
@@ -2902,13 +2955,13 @@
         }
         try {
           var xmlDom = xmlTextToDom(result.xml);
-          ws.clear();
+          if (clearBeforeImport) ws.clear();
           Blockly.Xml.domToWorkspace(xmlDom, ws);
-          if (window.stlConfigBackupRaw) addVariableBlocksFromBackup(ws);
+          addVariableBlocksFromBackup(ws);
           if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length) refreshBlockVarOptions(ws);
           closeImportModal();
           var runConnect = function () {
-            connectImportedStack(ws);
+            if (clearBeforeImport) connectImportedStack(ws);
             updateStl();
           };
           if (typeof requestAnimationFrame !== 'undefined') {

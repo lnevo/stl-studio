@@ -407,7 +407,9 @@
     var names = (typeof global !== 'undefined' && global.stlFriendlyNames) || {};
     return baseOpts.map(function (p) {
       var val = p[1];
-      return [names[val] ? val + ' – ' + names[val] : val, val];
+      if (!names[val]) return [val, val];
+      var friendly = String(names[val]).trim();
+      return [val + ' – ' + friendly, val];
     });
   }
   if (typeof global !== 'undefined') {
