@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.16';</script>
+  <script>var APP_VERSION = '1.20';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -221,25 +221,25 @@
     }
     .stl-byte-count {
       flex-shrink: 0;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       color: var(--muted);
-      padding: 0.25rem 1rem;
+      padding: 0.5rem 1rem 0.6rem;
       min-height: 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.5rem;
       align-items: stretch;
     }
     .stl-byte-count-bar-wrap {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      gap: 0.2rem;
       min-width: 80px;
       flex: 1;
       max-width: 240px;
     }
     .stl-byte-count-title {
-      font-size: 0.7rem;
+      font-size: 0.9rem;
       color: var(--muted);
       line-height: 1.2;
     }
@@ -276,11 +276,12 @@
     }
     .stl-byte-count-text {
       flex-shrink: 0;
+      font-size: 0.85rem;
     }
     .stl-byte-count.warning .stl-byte-count-text {
       color: #f59e0b;
     }
-    #stlOutput, .stl-split-container {
+    #stlOutputWrap, .stl-split-container {
       flex: 1;
       margin: 0;
       padding: 0;
@@ -290,13 +291,50 @@
       white-space: pre;
       min-height: 0;
     }
+    #stlOutputWrap {
+      display: flex;
+      flex-direction: column;
+      overflow: auto;
+      align-items: stretch;
+    }
+    #stlOutputWrap.with-line-numbers {
+      display: flex;
+      flex-direction: row;
+      overflow: hidden;
+    }
+    #stlOutputWrap .stl-line-nums {
+      display: none;
+      flex-shrink: 0;
+      width: 2.5rem;
+      padding: 0.25rem 0.25rem 1rem 1rem;
+      overflow: hidden;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      user-select: none;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    #stlOutputWrap.with-line-numbers .stl-line-nums {
+      display: block;
+    }
     #stlOutput {
-      padding: 1rem;
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      margin: 0;
+      padding: 0.25rem 1rem 1rem 1rem;
       resize: none;
       border: none;
       background: transparent;
       color: var(--green);
       outline: none;
+      text-align: left;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      font-family: inherit;
+      box-sizing: border-box;
     }
     #stlOutput::placeholder { color: var(--muted); }
     .stl-split-container {
@@ -305,11 +343,42 @@
       border-top: 1px solid var(--border);
       overflow: hidden;
     }
-    .stl-split-container .stl-pane {
-      padding: 1rem;
-      overflow: auto;
+    .stl-split-container .stl-pane-wrap {
+      display: flex;
       min-height: 0;
       flex: 1 1 0;
+      overflow: hidden;
+    }
+    .stl-split-container .stl-pane-wrap .stl-line-nums {
+      display: none;
+      flex-shrink: 0;
+      width: 2.5rem;
+      padding: 0.25rem 0.25rem 1rem 1rem;
+      overflow: hidden;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      user-select: none;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .stl-split-container .stl-pane-wrap.with-line-numbers .stl-line-nums {
+      display: block;
+    }
+    .stl-split-container .stl-pane-wrap pre.stl-pane {
+      flex: 1;
+      min-width: 0;
+    }
+    .stl-split-container .stl-pane {
+      margin: 0;
+      padding: 0.25rem 1rem 1rem 1rem;
+      overflow: auto;
+      min-height: 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      font-family: inherit;
+      box-sizing: border-box;
     }
     .stl-split-container .stl-raw-pane {
       border-bottom: 1px solid var(--border);
@@ -468,14 +537,26 @@
           <option value="compressed">Compressed (minimal, breaks after comments/labels)</option>
         </select>
       </div>
-      <div id="stlByteCount" class="stl-byte-count" aria-live="polite"></div>
       <div class="stl-format-row">
         <label><input type="checkbox" id="stlSplitView" aria-label="Show split view: raw code and expanded explanation"> Split view (raw + expanded)</label>
       </div>
-      <pre id="stlOutput" aria-label="Generated STL code">// Drag blocks from the left; the code updates as you edit. Use Copy or Download to use it.</pre>
+      <div class="stl-format-row">
+        <label><input type="checkbox" id="stlLineNumbers" aria-label="Show line numbers in STL view"> Show line numbers</label>
+      </div>
+      <div id="stlByteCount" class="stl-byte-count" aria-live="polite"></div>
+      <div class="stl-output-wrap" id="stlOutputWrap">
+        <div class="stl-line-nums" id="stlLineNums" aria-hidden="true"></div>
+        <pre id="stlOutput" aria-label="Generated STL code">// Drag blocks from the left; the code updates as you edit. Use Copy or Download to use it.</pre>
+      </div>
       <div id="stlSplitContainer" class="stl-split-container" style="display: none;" aria-label="Split view: raw STL on top, raw with explanations as comments on bottom">
-        <pre id="stlRawPane" class="stl-pane stl-raw-pane" aria-label="Raw STL"></pre>
-        <pre id="stlExpandedPane" class="stl-pane stl-expanded-pane" aria-label="Raw STL with expanded explanations as comments"></pre>
+        <div class="stl-pane-wrap">
+          <div class="stl-line-nums" id="stlRawLineNums" aria-hidden="true"></div>
+          <pre id="stlRawPane" class="stl-pane stl-raw-pane" aria-label="Raw STL"></pre>
+        </div>
+        <div class="stl-pane-wrap">
+          <div class="stl-line-nums" id="stlExpandedLineNums" aria-hidden="true"></div>
+          <pre id="stlExpandedPane" class="stl-pane stl-expanded-pane" aria-label="Raw STL with expanded explanations as comments"></pre>
+        </div>
       </div>
     </aside>
   </main>
@@ -622,7 +703,7 @@
       }
       function initApp() {
       (function setVersion() {
-        var v = window.APP_VERSION || '1.14';
+        var v = window.APP_VERSION || '1.20';
         document.title = 'STL Studio ' + v;
         var el = document.getElementById('appVersion');
         if (el) el.textContent = v;
@@ -632,7 +713,7 @@
         contents: [
           {
             kind: 'category',
-            name: 'Logic (RLO)',
+            name: 'Logic',
             colour: '#5ba6a6',
             contents: [
               { kind: 'block', type: 'stl_clear' },
@@ -762,6 +843,11 @@
       setTimeout(applyToolboxDarkText, 500);
 
       var stlOutput = document.getElementById('stlOutput');
+      var stlOutputWrap = document.getElementById('stlOutputWrap');
+      var stlLineNums = document.getElementById('stlLineNums');
+      var stlRawLineNums = document.getElementById('stlRawLineNums');
+      var stlExpandedLineNums = document.getElementById('stlExpandedLineNums');
+      var stlLineNumbers = document.getElementById('stlLineNumbers');
       var stlFormatSelect = document.getElementById('stlFormat');
       var stlByteCountEl = document.getElementById('stlByteCount');
       var stlSplitView = document.getElementById('stlSplitView');
@@ -827,20 +913,17 @@
       function updateByteCount() {
         if (!stlByteCountEl) return;
         var formatted = getFormattedStl();
-        if (!formatted || formatted.indexOf('// No blocks') === 0) {
-          stlByteCountEl.textContent = '';
-          stlByteCountEl.classList.remove('warning');
-          stlByteCountEl.removeAttribute('aria-label');
-          if (typeof Blockly !== 'undefined' && ws) {
-            var groupBlocks = getOrderedGroupBlocks(ws);
-            for (var g = 0; g < groupBlocks.length; g++) {
-              if (groupBlocks[g].getField('GROUP_BYTES')) groupBlocks[g].setFieldValue('— bytes', 'GROUP_BYTES');
-            }
+        var perGroup = [];
+        var totalBytes = 0;
+        if (formatted && formatted.indexOf('// No blocks') !== 0) {
+          perGroup = getPerGroupByteCounts(formatted);
+          totalBytes = perGroup.length > 0 ? perGroup.reduce(function (a, b) { return a + b; }, 0) : getByteCount(formatted);
+        } else if (typeof Blockly !== 'undefined' && ws) {
+          var groupBlocks = getOrderedGroupBlocks(ws);
+          for (var g = 0; g < groupBlocks.length; g++) {
+            if (groupBlocks[g].getField('GROUP_BYTES')) groupBlocks[g].setFieldValue('— bytes', 'GROUP_BYTES');
           }
-          return;
         }
-        var perGroup = getPerGroupByteCounts(formatted);
-        var totalBytes = perGroup.length > 0 ? perGroup.reduce(function (a, b) { return a + b; }, 0) : getByteCount(formatted);
         var overGroup = false;
         for (var j = 0; j < perGroup.length; j++) {
           if (perGroup[j] > BYTES_PER_GROUP) overGroup = true;
@@ -957,6 +1040,7 @@
 
       /** Build compressed/compact output: merge lines, breaking at config-style points (jumps, //; compact also breaks before labels). */
       function formatStl(raw, mode) {
+        raw = (raw || '').replace(/^[\r\n]+/, '');
         if (!raw || mode === 'readable') return raw;
         var lines = raw.split('\n');
         var noSpaceAfterColon = (mode === 'compact');
@@ -1112,7 +1196,13 @@
       function refreshStlDisplay(optionalContent) {
         var splitOn = stlSplitView && stlSplitView.checked;
         var formatted = optionalContent != null ? optionalContent : (splitOn ? (formatStl(lastCode, 'readable') || '// No blocks — add blocks from the left; code updates as you edit.') : (getFormattedStl() || '// No blocks — add blocks from the left; code updates as you edit.'));
-        if (stlOutput) stlOutput.style.display = splitOn ? 'none' : '';
+        // Last-mile cleanup: strip leading newlines and any leading blank/whitespace-only lines so
+        // line number 1 aligns with the first visible line (avoids "line 1 appears empty").
+        formatted = String(formatted || '').replace(/^[\r\n]+/, '');
+        var lines = formatted.split(/\n/);
+        while (lines.length && lines[0].trim() === '') lines.shift();
+        formatted = lines.join('\n');
+        if (stlOutputWrap) stlOutputWrap.style.display = splitOn ? 'none' : '';
         if (stlSplitContainer) {
           if (splitOn) {
             stlSplitContainer.style.display = 'flex';
@@ -1122,9 +1212,27 @@
             stlSplitContainer.style.height = '';
           }
         }
+        // Line numbers only in single view; split view has no line numbers (3 modes: none, line numbers, split)
+        var showLineNumbers = stlLineNumbers && stlLineNumbers.checked && !splitOn;
+        if (stlOutputWrap) stlOutputWrap.classList.toggle('with-line-numbers', !!showLineNumbers);
+        if (stlSplitContainer) {
+          var paneWraps = stlSplitContainer.querySelectorAll('.stl-pane-wrap');
+          for (var w = 0; w < paneWraps.length; w++) paneWraps[w].classList.toggle('with-line-numbers', false);
+        }
+        function fillLineNums(el, lineCount) {
+          if (!el) return;
+          if (!showLineNumbers || lineCount <= 0) { el.textContent = ''; return; }
+          var nums = [];
+          for (var i = 1; i <= lineCount; i++) nums.push(i);
+          el.textContent = nums.join('\n');
+        }
         if (splitOn && stlRawPane && stlExpandedPane) {
+          fillLineNums(stlLineNums, 0);
           stlRawPane.textContent = formatted;
-          stlExpandedPane.textContent = formatStlRawWithDescriptionComments(formatted);
+          var expandedText = formatStlRawWithDescriptionComments(formatted);
+          stlExpandedPane.textContent = expandedText;
+          fillLineNums(stlRawLineNums, 0);
+          fillLineNums(stlExpandedLineNums, 0);
           requestAnimationFrame(function () {
             if (!stlSplitContainer || !stlSplitView || !stlSplitView.checked) return;
             var available = stlSplitContainer.offsetHeight;
@@ -1134,6 +1242,9 @@
           });
         } else if (stlOutput) {
           stlOutput.textContent = formatted;
+          fillLineNums(stlLineNums, formatted.split(/\n/).length);
+        } else {
+          fillLineNums(stlLineNums, 0);
         }
       }
 
@@ -1154,7 +1265,7 @@
         try {
           if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length && window.getStlLogicVarOptions) refreshBlockVarOptions(ws);
           if (window.stlGenerator) window.stlGenerator.groupIndex = 0;
-          lastCode = window.stlGenerator ? window.stlGenerator.workspaceToCode(ws) : '';
+          lastCode = (window.stlGenerator ? window.stlGenerator.workspaceToCode(ws) : '').replace(/^[\r\n]+/, '');
         } catch (e) {
           lastCode = '// Error: ' + (e.message || String(e));
         }
@@ -1173,6 +1284,7 @@
             if (stlSplitView.checked) {
               stlFormatSelect.value = 'readable';
               stlFormatSelect.disabled = true;
+              if (stlLineNumbers) stlLineNumbers.checked = false;
             } else {
               stlFormatSelect.disabled = false;
             }
@@ -1180,7 +1292,16 @@
             updateByteCount();
           });
         } else if (stlSplitView) {
-          stlSplitView.addEventListener('change', function () { refreshStlDisplay(); });
+          stlSplitView.addEventListener('change', function () {
+            if (stlSplitView.checked && stlLineNumbers) stlLineNumbers.checked = false;
+            refreshStlDisplay();
+          });
+        }
+        if (stlLineNumbers) {
+          stlLineNumbers.addEventListener('change', function () {
+            if (stlLineNumbers.checked && stlSplitView) stlSplitView.checked = false;
+            refreshStlDisplay();
+          });
         }
         var stlPanelResizer = document.getElementById('stlPanelResizer');
         var stlPanel = document.getElementById('stlPanel');
