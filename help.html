@@ -139,9 +139,23 @@
       font-size: 0.85rem; transition: border-color .15s, color .15s;
     }
     .toc-grid a:hover { border-color: var(--green); color: var(--text); }
+    #back-bar {
+      position: sticky; top: 0; z-index: 200;
+      background: #12151a; border-bottom: 1px solid var(--border);
+      padding: 0.45rem 1rem;
+    }
+    #back-bar button {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 5px; padding: 0.25rem 0.75rem; font-size: 0.82rem;
+      cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    #back-bar button:hover { border-color: var(--green); color: var(--text); }
   </style>
 </head>
 <body>
+<div id="back-bar">
+  <button onclick="stlHelpGoBack()">← Back to STL Studio</button>
+</div>
 <div class="layout">
 
 <!-- ─────────────── NAV ─────────────── -->
@@ -724,6 +738,19 @@
 </div>
 
 <script>
+  function stlHelpGoBack() {
+    if (window.parent !== window) {
+      // Inside iframe modal — ask parent to close it
+      window.parent.postMessage('stl:closeHelp', '*');
+    } else if (window.opener && !window.opener.closed) {
+      // Opened as a new tab from the app — return focus and close
+      window.opener.focus();
+      window.close();
+    } else {
+      window.location.href = 'index.html';
+    }
+  }
+
   // Highlight active nav link based on scroll position
   var sections = document.querySelectorAll('section[id], h2[id]');
   var navLinks = document.querySelectorAll('nav a[href^="#"]');

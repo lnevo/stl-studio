@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.29';</script>
+  <script>var APP_VERSION = '1.30';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -2741,69 +2741,22 @@
       logicStringModal.onclick = function (e) {
         if (e.target === logicStringModal) closeLogicStringModal();
       };
-      var helpRefModal = document.getElementById('helpRefModal');
-      var _helpSrcdocReady = false;
-      var _helpPendingAnchor = null;
-
       // Intercept Blockly's right-click "Help" which calls window.open(helpUrl)
       var _origWindowOpen = window.open;
       window.open = function(url, target, features) {
         if (typeof url === 'string' && /^help\.html/.test(url)) {
-          var anchor = url.indexOf('#') >= 0 ? url.split('#')[1] : null;
-          openHelpModal(anchor);
+          openHelp(url.indexOf('#') >= 0 ? url.split('#')[1] : null);
           return window;
         }
         return _origWindowOpen.apply(window, arguments);
       };
 
-      var _helpSrcdocReady = false;
-      var _helpPendingAnchor = null;
-
-      function openHelpModal(anchor) {
-        // On file:// fetch is blocked by CORS; fall back to a new tab
-        if (window.location.protocol === 'file:') {
-          _origWindowOpen.call(window, 'help.html' + (anchor ? '#' + anchor : ''), 'stl_help');
-          return;
-        }
-        _loadHelpFrame(anchor);
-        helpRefModal.classList.add('visible');
-        helpRefModal.setAttribute('aria-hidden', 'false');
+      function openHelp(anchor) {
+        _origWindowOpen.call(window, 'help.html' + (anchor ? '#' + anchor : ''), 'stl_help');
       }
 
-      function _loadHelpFrame(anchor) {
-        var frame = document.getElementById('helpRefFrame');
-        if (_helpSrcdocReady) {
-          if (anchor) {
-            try { frame.contentDocument.getElementById(anchor).scrollIntoView({ behavior: 'smooth' }); } catch(e) {}
-          }
-          return;
-        }
-        _helpPendingAnchor = anchor || null;
-        fetch('help.html')
-          .then(function(r) { return r.text(); })
-          .then(function(html) {
-            _helpSrcdocReady = true;
-            frame.srcdoc = html;
-            frame.onload = function() {
-              frame.onload = null;
-              if (_helpPendingAnchor) {
-                try { frame.contentDocument.getElementById(_helpPendingAnchor).scrollIntoView(); } catch(e) {}
-                _helpPendingAnchor = null;
-              }
-            };
-          });
-      }
+      document.getElementById('btnInputsRef').onclick = function () { openHelp(null); };
 
-      document.getElementById('btnInputsRef').onclick = function () { openHelpModal(null); };
-
-      function closeHelpRefModal() {
-        helpRefModal.classList.remove('visible');
-        helpRefModal.setAttribute('aria-hidden', 'true');
-      }
-      document.getElementById('helpRefClose').onclick = closeHelpRefModal;
-      helpRefModal.onclick = function (e) {
-        if (e.target === helpRefModal) closeHelpRefModal();
-      };
 
       document.getElementById('btnExample').onclick = function () {
         // First JC E1 = C-shape (wraps body up to the one E1 label). Second JC E1 inside = single-line (no new label).
