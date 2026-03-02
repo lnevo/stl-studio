@@ -79,16 +79,16 @@
     return blockXml(first.type, first.fields, nextXml, stmtName, stmtList);
   }
 
-  var NEST_START_TO_C = {
-    stl_or_group_start: 'stl_or_group_c',
-    stl_and_group_start: 'stl_and_group_c',
-    stl_on_group_start: 'stl_on_group_c',
-    stl_x_group_start: 'stl_x_group_c',
-    stl_xn_group_start: 'stl_xn_group_c'
+  var NEST_START_TO_NEST_TYPE = {
+    stl_or_group_start: 'o(',
+    stl_and_group_start: 'a(',
+    stl_on_group_start: 'on(',
+    stl_x_group_start: 'x(',
+    stl_xn_group_start: 'xn('
   };
 
   /**
-   * Merge nest start + body + nest end into single C-shaped descriptors (e.g. stl_or_group_c with .body).
+   * Merge nest start + body + nest end into single C-shaped descriptors (stl_nest_c with .body and NEST_TYPE).
    * Finds innermost group_end, matches to its group_start, replaces run with one descriptor; repeats until none left.
    */
   function mergeNestGroups(list) {
@@ -101,7 +101,7 @@
     var startIdx = -1;
     for (var i = endIdx - 1; i >= 0; i--) {
       if (list[i].type === 'stl_group_end') depth++;
-      else if (NEST_START_TO_C[list[i].type]) {
+      else if (NEST_START_TO_NEST_TYPE[list[i].type]) {
         depth--;
         if (depth === 0) { startIdx = i; break; }
       }
@@ -109,9 +109,9 @@
     if (startIdx < 0) return list;
     var body = list.slice(startIdx + 1, endIdx);
     var mergedBody = mergeNestGroups(body);
-    var cType = NEST_START_TO_C[list[startIdx].type];
-    if (!cType) return list;
-    var newItem = { type: cType, fields: {}, body: mergedBody };
+    var nestType = NEST_START_TO_NEST_TYPE[list[startIdx].type];
+    if (!nestType) return list;
+    var newItem = { type: 'stl_nest_c', fields: { NEST_TYPE: nestType }, body: mergedBody };
     var newList = list.slice(0, startIdx).concat([newItem], list.slice(endIdx + 1));
     return mergeNestGroups(newList);
   }
@@ -164,24 +164,24 @@
         return { type: 'stl_set', fields: {} };
       case 'A':
         if (arg === '(') return { type: 'stl_and_group_start', fields: {} };
-        return validLogicVar(arg) ? { type: 'stl_and', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_logic', fields: { VAR: normVar(arg), OP: 'a' } } : null;
       case 'LD':
-        return validLogicVar(arg) ? { type: 'stl_and', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_logic', fields: { VAR: normVar(arg), OP: 'a' } } : null;
       case 'O':
         if (arg === '(') return { type: 'stl_or_group_start', fields: {} };
         if (!arg) return null;
-        return validLogicVar(arg) ? { type: 'stl_or', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_logic', fields: { VAR: normVar(arg), OP: 'o' } } : null;
       case 'AN':
-        return validLogicVar(arg) ? { type: 'stl_and_not', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_logic', fields: { VAR: normVar(arg), OP: 'an' } } : null;
       case 'ON':
         if (arg === '(') return { type: 'stl_on_group_start', fields: {} };
-        return validLogicVar(arg) ? { type: 'stl_or_not', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_logic', fields: { VAR: normVar(arg), OP: 'on' } } : null;
       case 'X':
         if (arg === '(') return { type: 'stl_x_group_start', fields: {} };
-        return validLogicVar(arg) ? { type: 'stl_x', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_xor', fields: { VAR: normVar(arg), XOP: 'x' } } : null;
       case 'XN':
         if (arg === '(') return { type: 'stl_xn_group_start', fields: {} };
-        return validLogicVar(arg) ? { type: 'stl_xn', fields: { VAR: normVar(arg) } } : null;
+        return validLogicVar(arg) ? { type: 'stl_xor', fields: { VAR: normVar(arg), XOP: 'xn' } } : null;
       case 'SAVE':
         return { type: 'stl_save', fields: {} };
       case 'NOT':
@@ -189,41 +189,41 @@
       case '=':
         return (validVar(arg) || validMQYZ(arg)) ? { type: 'stl_assign', fields: { VAR: normVar(arg) } } : null;
       case 'S':
-        return validSVar(arg) ? { type: 'stl_s', fields: { VAR: normVar(arg) } } : null;
+        return validSVar(arg) ? { type: 'stl_latch', fields: { VAR: normVar(arg), SOP: 's' } } : null;
       case 'R':
-        return validRVar(arg) ? { type: 'stl_r', fields: { VAR: normVar(arg) } } : null;
+        return validRVar(arg) ? { type: 'stl_latch', fields: { VAR: normVar(arg), SOP: 'r' } } : null;
       case 'JC':
-        return { type: 'stl_jc', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jc' } };
       case 'JCN':
-        return { type: 'stl_jcn', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jcn' } };
       case 'JU':
-        return { type: 'stl_ju', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'ju' } };
       case 'JCB':
-        return { type: 'stl_jcb', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jcb' } };
       case 'JNB':
-        return { type: 'stl_jnb', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jnb' } };
       case 'JBI':
-        return { type: 'stl_jbi', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jbi' } };
       case 'JNBI':
-        return { type: 'stl_jnbi', fields: { LABEL: (arg || 'E1').slice(0, 4) } };
+        return { type: 'stl_jump', fields: { LABEL: (arg || 'E1').slice(0, 4), COND: 'jnbi' } };
       case 'L':
         return parseL(parts.slice(1).join(' ').trim());
       case 'SD':
-        return validTimer(arg) ? { type: 'stl_sd', fields: { TIMER: normVar(arg) } } : null;
+        return validTimer(arg) ? { type: 'stl_timer', fields: { TIMER: normVar(arg), TTYPE: 'sd' } } : null;
       case 'SE':
-        return validTimer(arg) ? { type: 'stl_se', fields: { TIMER: normVar(arg) } } : null;
+        return validTimer(arg) ? { type: 'stl_timer', fields: { TIMER: normVar(arg), TTYPE: 'se' } } : null;
       case 'SP':
-        return validTimer(arg) ? { type: 'stl_sp', fields: { TIMER: normVar(arg) } } : null;
+        return validTimer(arg) ? { type: 'stl_timer', fields: { TIMER: normVar(arg), TTYPE: 'sp' } } : null;
       case 'SS':
-        return validTimer(arg) ? { type: 'stl_ss', fields: { TIMER: normVar(arg) } } : null;
+        return validTimer(arg) ? { type: 'stl_timer', fields: { TIMER: normVar(arg), TTYPE: 'ss' } } : null;
       case 'SF':
-        return validTimer(arg) ? { type: 'stl_sf', fields: { TIMER: normVar(arg) } } : null;
+        return validTimer(arg) ? { type: 'stl_timer', fields: { TIMER: normVar(arg), TTYPE: 'sf' } } : null;
       case 'FR':
         return validTimer(arg) ? { type: 'stl_fr', fields: { TIMER: normVar(arg) } } : null;
       case 'FP':
-        return validMQYZ(arg) ? { type: 'stl_fp', fields: { VAR: normVar(arg) } } : null;
+        return validMQYZ(arg) ? { type: 'stl_transition', fields: { VAR: normVar(arg), TDIR: 'fp' } } : null;
       case 'FN':
-        return validMQYZ(arg) ? { type: 'stl_fn', fields: { VAR: normVar(arg) } } : null;
+        return validMQYZ(arg) ? { type: 'stl_transition', fields: { VAR: normVar(arg), TDIR: 'fn' } } : null;
       case 'O(':
         return { type: 'stl_or_group_start', fields: {} };
       case 'A(':
@@ -362,43 +362,43 @@
         continue;
       }
       if ((m = new RegExp('^ON' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_or_not', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_logic', fields: { VAR: normVar(m[1]), OP: 'on' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^O' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_or', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_logic', fields: { VAR: normVar(m[1]), OP: 'o' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^XN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validLogicVar(m[1])) {
-        list.push({ type: 'stl_xn', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_xor', fields: { VAR: normVar(m[1]), XOP: 'xn' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^X' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validLogicVar(m[1])) {
-        list.push({ type: 'stl_x', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_xor', fields: { VAR: normVar(m[1]), XOP: 'x' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^AN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_and_not', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_logic', fields: { VAR: normVar(m[1]), OP: 'an' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^LD' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_and', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_logic', fields: { VAR: normVar(m[1]), OP: 'a' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^A' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_and', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_logic', fields: { VAR: normVar(m[1]), OP: 'a' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
@@ -411,7 +411,7 @@
       }
       if ((m = new RegExp('^S' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
         if (validSVar(m[1])) {
-          list.push({ type: 'stl_s', fields: { VAR: normVar(m[1]) } });
+          list.push({ type: 'stl_latch', fields: { VAR: normVar(m[1]), SOP: 's' } });
           rest = rest.slice(m[0].length);
           triedCompact = true;
           continue;
@@ -419,7 +419,7 @@
       }
       if ((m = new RegExp('^R' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest))) {
         if (validRVar(m[1])) {
-          list.push({ type: 'stl_r', fields: { VAR: normVar(m[1]) } });
+          list.push({ type: 'stl_latch', fields: { VAR: normVar(m[1]), SOP: 'r' } });
           rest = rest.slice(m[0].length);
           triedCompact = true;
           continue;
@@ -440,91 +440,79 @@
         continue;
       }
       if ((m = new RegExp('^SD' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
-        list.push({ type: 'stl_sd', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        list.push({ type: 'stl_timer', fields: { TIMER: normVar(m[1]), TTYPE: 'sd' } });
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^FR' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
         list.push({ type: 'stl_fr', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^SE' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
-        list.push({ type: 'stl_se', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        list.push({ type: 'stl_timer', fields: { TIMER: normVar(m[1]), TTYPE: 'se' } });
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^SP' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
-        list.push({ type: 'stl_sp', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        list.push({ type: 'stl_timer', fields: { TIMER: normVar(m[1]), TTYPE: 'sp' } });
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^SS' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
-        list.push({ type: 'stl_ss', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        list.push({ type: 'stl_timer', fields: { TIMER: normVar(m[1]), TTYPE: 'ss' } });
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^SF' + OPT + '(T\\d{1,2})', 'i').exec(rest)) && validTimer(m[1])) {
-        list.push({ type: 'stl_sf', fields: { TIMER: normVar(m[1]) } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
+        list.push({ type: 'stl_timer', fields: { TIMER: normVar(m[1]), TTYPE: 'sf' } });
+        rest = rest.slice(m[0].length); triedCompact = true; continue;
       }
       if ((m = new RegExp('^FP' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validMQYZ(m[1])) {
-        list.push({ type: 'stl_fp', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_transition', fields: { VAR: normVar(m[1]), TDIR: 'fp' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^FN' + OPT + '(' + VAR_PATTERN + ')', 'i').exec(rest)) && validMQYZ(m[1])) {
-        list.push({ type: 'stl_fn', fields: { VAR: normVar(m[1]) } });
+        list.push({ type: 'stl_transition', fields: { VAR: normVar(m[1]), TDIR: 'fn' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JC' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jc', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jc' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JCN' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jcn', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jcn' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JU' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_ju', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'ju' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JCB' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jcb', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jcb' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JNB' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jnb', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jnb' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jbi', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jbi' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JNBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jnbi', fields: { LABEL: m[1].slice(0, 4) } });
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jnbi' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
@@ -581,8 +569,9 @@
     }
     while (i < list.length) {
       var item = list[i];
-      if (item.type === 'stl_jc' || item.type === 'stl_jcn' || item.type === 'stl_ju') {
+      if (item.type === 'stl_jump') {
         var label = (item.fields && item.fields.LABEL) ? String(item.fields.LABEL).trim().slice(0, 4) : 'E1';
+        var cond = (item.fields && item.fields.COND) ? String(item.fields.COND) : 'ju';
         if (labelAppearsBefore(i, label)) {
           result.push(item);
           i++;
@@ -593,8 +582,7 @@
         while (j < list.length) {
           var nextItem = list[j];
           if (nextItem.type === 'stl_label' && nextItem.fields && String(nextItem.fields.LABEL).trim().slice(0, 4) === label) {
-            var cType = item.type === 'stl_jc' ? 'stl_jump_c_jc' : item.type === 'stl_jcn' ? 'stl_jump_c_jcn' : 'stl_jump_c_ju';
-            result.push({ type: cType, fields: { LABEL: label }, body: mergeJumpLabel(body) });
+            result.push({ type: 'stl_jump_c', fields: { LABEL: label, COND: cond }, body: mergeJumpLabel(body) });
             i = j + 1;
             break;
           }
