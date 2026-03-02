@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.22';</script>
+  <script>var APP_VERSION = '1.23';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -718,13 +718,9 @@
             contents: [
               { kind: 'block', type: 'stl_clear' },
               { kind: 'block', type: 'stl_set' },
-              { kind: 'block', type: 'stl_and' },
-              { kind: 'block', type: 'stl_or' },
-              { kind: 'block', type: 'stl_and_not' },
-              { kind: 'block', type: 'stl_or_not' },
+              { kind: 'block', type: 'stl_logic' },
               { kind: 'block', type: 'stl_not' },
-              { kind: 'block', type: 'stl_x' },
-              { kind: 'block', type: 'stl_xn' },
+              { kind: 'block', type: 'stl_xor' },
               { kind: 'block', type: 'stl_save' }
             ]
           },
@@ -734,8 +730,7 @@
             colour: '#a65b5b',
             contents: [
               { kind: 'block', type: 'stl_assign' },
-              { kind: 'block', type: 'stl_s' },
-              { kind: 'block', type: 'stl_r' }
+              { kind: 'block', type: 'stl_latch' }
             ]
           },
           {
@@ -744,21 +739,16 @@
             colour: '#5b74a6',
             contents: [
               { kind: 'block', type: 'stl_l_time' },
-              { kind: 'block', type: 'stl_sd' },
-              { kind: 'block', type: 'stl_se' },
-              { kind: 'block', type: 'stl_sp' },
-              { kind: 'block', type: 'stl_ss' },
-              { kind: 'block', type: 'stl_sf' },
+              { kind: 'block', type: 'stl_timer' },
               { kind: 'block', type: 'stl_fr' }
             ]
           },
           {
             kind: 'category',
-            name: 'Edge',
+            name: 'Transition',
             colour: '#b8a83a',
             contents: [
-              { kind: 'block', type: 'stl_fp' },
-              { kind: 'block', type: 'stl_fn' }
+              { kind: 'block', type: 'stl_transition' }
             ]
           },
           {
@@ -766,16 +756,8 @@
             name: 'Jumps',
             colour: '#4CAF50',
             contents: [
-              { kind: 'block', type: 'stl_jump_c_jc' },
-              { kind: 'block', type: 'stl_jump_c_jcn' },
-              { kind: 'block', type: 'stl_jump_c_ju' },
-              { kind: 'block', type: 'stl_jc' },
-              { kind: 'block', type: 'stl_jcn' },
-              { kind: 'block', type: 'stl_ju' },
-              { kind: 'block', type: 'stl_jcb' },
-              { kind: 'block', type: 'stl_jnb' },
-              { kind: 'block', type: 'stl_jbi' },
-              { kind: 'block', type: 'stl_jnbi' },
+              { kind: 'block', type: 'stl_jump_c' },
+              { kind: 'block', type: 'stl_jump' },
               { kind: 'block', type: 'stl_label' }
             ]
           },
@@ -784,11 +766,7 @@
             name: 'Nesting',
             colour: '#c47c30',
             contents: [
-              { kind: 'block', type: 'stl_or_group_c' },
-              { kind: 'block', type: 'stl_on_group_c' },
-              { kind: 'block', type: 'stl_and_group_c' },
-              { kind: 'block', type: 'stl_x_group_c' },
-              { kind: 'block', type: 'stl_xn_group_c' }
+              { kind: 'block', type: 'stl_nest_c' }
             ]
           },
           {
@@ -866,24 +844,43 @@
       }
 
       /**
-       * Split STL by group headers; return array of byte counts per group.
-       * Counts only the group body (logic), not the "// Group N: name" line, so the result
-       * matches what is stored in Conditionals.Logic(n).MultiLine and what JMRI reports.
-       * Line endings are normalized to \\n before counting so \\r\\n does not double-count.
+       * Normalize group body for byte count: exclude comment-only lines (device MultiLine does not
+       * store them), collapse multiple newlines to one, trim. Matches config/JMRI stored size.
        */
-      function getPerGroupByteCounts(formatted) {
+      function normalizeBodyForByteCount(body) {
+        if (!body || !body.trim()) return '';
+        return body.split('\n')
+          .map(function (line) { return line.trim(); })
+          .filter(function (line) { return line && line.indexOf('//') !== 0; })
+          .join('\n')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+      }
+
+      /**
+       * Split STL by group headers; return array of byte counts per group.
+       * Counts only the group body (logic), not the "//Group N: name" line. Body is normalized
+       * (comment-only lines excluded, newlines collapsed) to match device/JMRI MultiLine size.
+       */
+      function getPerGroupByteCounts(formatted, compactFn) {
         if (!formatted || !formatted.trim()) return [];
         var normalized = (formatted + '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        var re = /\/\/ Group \d+:[\s\S]*?(?=\/\/ Group \d+:|$)/g;
+        var re = /\/\/\s*Group\s+\d+:[\s\S]*?(?=\/\/\s*Group\s+\d+:|$)/g;
         var out = [];
         var m;
         while ((m = re.exec(normalized)) !== null) {
           var segment = m[0];
           var firstLineEnd = segment.indexOf('\n');
           var body = firstLineEnd >= 0 ? segment.slice(firstLineEnd + 1).trim() : '';
-          out.push(getByteCount(body));
+          body = normalizeBodyForByteCount(body);
+          var toCount = compactFn ? compactFn(body) : body;
+          out.push(getByteCount(toCount));
         }
-        if (out.length === 0) return [getByteCount((normalized).trim())];
+        if (out.length === 0) {
+          var total = normalizeBodyForByteCount((normalized).trim());
+          var toCount = compactFn ? compactFn(total) : total;
+          return [getByteCount(toCount)];
+        }
         return out;
       }
 
@@ -911,12 +908,12 @@
 
       function updateByteCount() {
         if (!stlByteCountEl) return;
-        var formatted = getFormattedStl();
+        var formattedReadable = (lastCode && lastCode.indexOf('// No blocks') !== 0) ? formatStl(lastCode, 'readable') : '';
         var perGroup = [];
         var totalBytes = 0;
-        if (formatted && formatted.indexOf('// No blocks') !== 0) {
-          perGroup = getPerGroupByteCounts(formatted);
-          totalBytes = perGroup.length > 0 ? perGroup.reduce(function (a, b) { return a + b; }, 0) : getByteCount(formatted);
+        if (formattedReadable && formattedReadable.indexOf('// No blocks') !== 0) {
+          perGroup = getPerGroupByteCounts(formattedReadable);
+          totalBytes = perGroup.length > 0 ? perGroup.reduce(function (a, b) { return a + b; }, 0) : getByteCount(formattedReadable.trim());
         } else if (typeof Blockly !== 'undefined' && ws) {
           var groupBlocks = getOrderedGroupBlocks(ws);
           for (var g = 0; g < groupBlocks.length; g++) {
@@ -1007,6 +1004,8 @@
               var pct = Math.round((bytes / BYTES_PER_GROUP) * 100);
               var txt = bytes + ' bytes (' + pct + '%)';
               if (bytes > BYTES_PER_GROUP) txt += ' — over ' + BYTES_PER_GROUP;
+              if (bytes > BYTES_PER_GROUP) txt += ' — OVER LIMIT';
+              else if (pct >= 95) txt += ' — near limit';
               groupBlocks[g].setFieldValue(txt, 'GROUP_BYTES');
             }
           }
@@ -1177,7 +1176,7 @@
           var line = lines[i];
           out.push(line);
           var desc = describeStlLine(line);
-          if (desc) out.push('// ' + desc);
+          if (desc) out.push('//' + desc);
         }
         return out.join('\n');
       }
@@ -1247,15 +1246,51 @@
         }
       }
 
+      var COND_TO_OPCODE_LABEL = { jc: '[JC]', jcn: '[JCN]', ju: '[JU]', jcb: '[JCB]', jnb: '[JNB]', jbi: '[JBI]', jnbi: '[JNBI]' };
+      var NEST_TYPE_TO_OPCODE_LABEL = { 'o(': '[O(]', 'on(': '[ON(]', 'a(': '[A(]', 'x(': '[X(]', 'xn(': '[XN(]' };
       function syncJumpCLabelDisplays(workspace) {
         if (!workspace || !workspace.getAllBlocks) return;
         var blocks = workspace.getAllBlocks(false);
         for (var i = 0; i < blocks.length; i++) {
           var block = blocks[i];
           var type = block.type || '';
-          if (type !== 'stl_jump_c_jc' && type !== 'stl_jump_c_jcn' && type !== 'stl_jump_c_ju') continue;
-          var labelVal = block.getFieldValue('LABEL');
-          if (labelVal != null && block.getField('LABEL_DISPLAY')) block.setFieldValue(String(labelVal).trim().slice(0, 4) || 'E1', 'LABEL_DISPLAY');
+          if (type === 'stl_jump_c') {
+            var labelVal = block.getFieldValue('LABEL');
+            if (labelVal != null && block.getField('LABEL_DISPLAY')) block.setFieldValue(String(labelVal).trim().slice(0, 4) || 'E1', 'LABEL_DISPLAY');
+          }
+          if (type === 'stl_jump' || type === 'stl_jump_c') {
+            var cond = block.getFieldValue('COND');
+            if (cond != null && block.getField('OPCODE_LABEL')) block.setFieldValue(COND_TO_OPCODE_LABEL[cond] || '[JU]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_logic') {
+            var op = block.getFieldValue('OP');
+            var lbl = { a: '[A]', o: '[O]', an: '[AN]', on: '[ON]' };
+            if (op != null && block.getField('OPCODE_LABEL')) block.setFieldValue(lbl[op] || '[A]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_nest_c') {
+            var nestType = block.getFieldValue('NEST_TYPE');
+            if (nestType != null && block.getField('OPCODE_LABEL')) block.setFieldValue(NEST_TYPE_TO_OPCODE_LABEL[nestType] || '[O(]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_xor') {
+            var xop = block.getFieldValue('XOP');
+            var xlbl = { x: '[X]', xn: '[XN]' };
+            if (xop != null && block.getField('OPCODE_LABEL')) block.setFieldValue(xlbl[xop] || '[X]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_transition') {
+            var tdir = block.getFieldValue('TDIR');
+            var tlbl = { fp: '[FP]', fn: '[FN]' };
+            if (tdir != null && block.getField('OPCODE_LABEL')) block.setFieldValue(tlbl[tdir] || '[FP]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_latch') {
+            var sop = block.getFieldValue('SOP');
+            var slbl = { s: '[S]', r: '[R]' };
+            if (sop != null && block.getField('OPCODE_LABEL')) block.setFieldValue(slbl[sop] || '[S]', 'OPCODE_LABEL');
+          }
+          if (type === 'stl_timer') {
+            var ttype = block.getFieldValue('TTYPE');
+            var ttlbl = { sd: '[SD]', se: '[SE]', sp: '[SP]', ss: '[SS]', sf: '[SF]' };
+            if (ttype != null && block.getField('OPCODE_LABEL')) block.setFieldValue(ttlbl[ttype] || '[SD]', 'OPCODE_LABEL');
+          }
         }
       }
 
@@ -2300,10 +2335,9 @@
       /** After loading friendly names (config backup), refresh VAR dropdowns so blocks show "I0.0 – Description". */
       function refreshBlockVarOptions(workspace) {
         if (!workspace || !window.getStlLogicVarOptions) return;
-        var logicTypes = ['stl_and', 'stl_or', 'stl_and_not', 'stl_or_not'];
+        var logicTypes = ['stl_logic', 'stl_xor'];
         var assignTypes = ['stl_assign'];
-        var sTypes = ['stl_s'];
-        var rTypes = ['stl_r'];
+        var latchTypes = ['stl_latch'];
         var allBlocks = workspace.getAllBlocks(false);
         for (var i = 0; i < allBlocks.length; i++) {
           var block = allBlocks[i];
@@ -2313,8 +2347,7 @@
           var opts;
           if (logicTypes.indexOf(type) >= 0) opts = window.getStlLogicVarOptions();
           else if (assignTypes.indexOf(type) >= 0) opts = window.getStlAssignVarOptions();
-          else if (sTypes.indexOf(type) >= 0) opts = window.getStlSVarOptions();
-          else if (rTypes.indexOf(type) >= 0) opts = window.getStlRVarOptions();
+          else if (latchTypes.indexOf(type) >= 0) opts = window.getStlRVarOptions();
           else continue;
           var currentVal = block.getFieldValue('VAR');
           field.setOptions(opts);
@@ -2412,8 +2445,8 @@
           var stl = decoded.trim();
           if (!stl) continue;
           var name = groupNames[groupNum];
-          if (name) stlParts.push('// Group ' + groupNum + ': ' + name + '\n' + stl);
-          else stlParts.push('// Group ' + groupNum + '\n' + stl);
+          if (name) stlParts.push('//Group ' + groupNum + ': ' + name + '\n' + stl);
+          else stlParts.push('//Group ' + groupNum + '\n' + stl);
         }
         return stlParts.join('\n\n');
       }
@@ -2486,7 +2519,7 @@
           var line = '';
           if (label) line += label + (label.indexOf(':') >= 0 ? ' ' : ': ');
           if (op) line += op + (name ? ' ' + name : '');
-          if (comment) line += (line ? ' // ' : '// ') + comment;
+          if (comment) line += (line ? ' //' : '//') + comment;
           if (line) stlLines.push(line.trim());
         }
         return stlLines.length ? stlLines.join('\n') : null;
@@ -2703,21 +2736,21 @@
 
       document.getElementById('btnExample').onclick = function () {
         // First JC E1 = C-shape (wraps body up to the one E1 label). Second JC E1 inside = single-line (no new label).
-        var jcBody = '<block type="stl_and"><field name="VAR">I0.0</field>' +
+        var jcBody = '<block type="stl_logic"><field name="VAR">I0.0</field><field name="OP">a</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.1</field>' +
-          '<next><block type="stl_jc"><field name="LABEL">E1</field>' +
+          '<next><block type="stl_jump"><field name="LABEL">E1</field><field name="COND">jc</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.0</field></block>' +
           '</next></block></next></block></next></block>';
-        var outerJc = '<block type="stl_jump_c_jc" x="0" y="0">' +
-          '<field name="LABEL">E1</field><field name="LABEL_DISPLAY">E1</field>' +
+        var outerJc = '<block type="stl_jump_c" x="0" y="0">' +
+          '<field name="LABEL">E1</field><field name="COND">jc</field><field name="LABEL_DISPLAY">E1</field>' +
           '<statement name="BODY">' + jcBody + '</statement></block>';
         var example = '<xml xmlns="https://developers.google.com/blockly/xml">' +
           '<block type="stl_clear" x="20" y="20">' +
           '<next><block type="stl_assign"><field name="VAR">Q0.0</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.1</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.2</field>' +
-          '<next><block type="stl_or"><field name="VAR">I0.4</field>' +
-          '<next><block type="stl_or"><field name="VAR">I0.5</field>' +
+          '<next><block type="stl_logic"><field name="VAR">I0.4</field><field name="OP">o</field>' +
+          '<next><block type="stl_logic"><field name="VAR">I0.5</field><field name="OP">o</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.2</field>' +
           '<next>' + outerJc + '</next></block></next></block></next></block>' +
           '</next></block></next></block></next></block></next></block>' +
