@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.43';</script>
+  <script>var APP_VERSION = '1.44';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -1720,9 +1720,10 @@
       }
 
       /** Build compact share payload: stl + names/event IDs only (no workspace XML). */
-      function buildSharePayload() {
+      function buildSharePayload(stlOverride) {
         refreshJmriFromWorkspace(ws);
-        var stl = getFormattedStl();
+        // Always share compact STL to minimize URL size regardless of current display mode.
+        var stl = stlOverride != null ? String(stlOverride || '') : formatStl(lastCode || '', 'compact');
         if (!stl || stl.indexOf('// No blocks') === 0) return null;
         function definedInput(r) { return (r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()) || (r[3] && String(r[3]).trim()); }
         function definedTxRx(r) { return (r[1] && String(r[1]).trim()) || (r[2] && String(r[2]).trim()); }
@@ -1730,12 +1731,7 @@
         var outputs = (window.stlJmriOutputs || []).filter(definedInput);
         var tx = (window.stlJmriTransmitters || []).filter(definedTxRx);
         var rx = (window.stlJmriReceivers || []).filter(definedTxRx);
-        var fn = {};
-        if (window.stlFriendlyNames && typeof window.stlFriendlyNames === 'object') {
-          for (var k in window.stlFriendlyNames) { if (window.stlFriendlyNames[k]) fn[k] = window.stlFriendlyNames[k]; }
-        }
         var payload = { stl: stl };
-        if (Object.keys(fn).length) payload.fn = fn;
         if (inputs.length) payload.i = inputs;
         if (outputs.length) payload.o = outputs;
         if (tx.length) payload.t = tx;
@@ -1744,11 +1740,10 @@
       }
 
       /** Same as buildSharePayload but with event ID fields stripped (names only), for a smaller share link. */
-      function buildSharePayloadNamesOnly() {
-        var full = buildSharePayload();
+      function buildSharePayloadNamesOnly(stlOverride) {
+        var full = buildSharePayload(stlOverride);
         if (!full) return null;
         var payload = { stl: full.stl };
-        if (full.fn && Object.keys(full.fn).length) payload.fn = full.fn;
         if (full.i && full.i.length) payload.i = full.i.map(function (r) { return [r[0], r[1] || '', '', '']; });
         if (full.o && full.o.length) payload.o = full.o.map(function (r) { return [r[0], r[1] || '', '', '']; });
         if (full.t && full.t.length) payload.t = full.t.map(function (r) { return [r[0], r[1] || '', '']; });
@@ -1759,7 +1754,7 @@
       /** Apply share payload: merge names/event IDs into full grids, set window, add variable blocks. Call after loading STL XML into workspace. */
       function applySharePayload(payload) {
         if (!payload) return;
-        window.stlFriendlyNames = payload.fn || {};
+        window.stlFriendlyNames = {};
         function defaultIo(prefix) {
           var out = [];
           for (var g = 0; g < 16; g++) for (var b = 0; b < 8; b++) {
@@ -1787,6 +1782,15 @@
         window.stlJmriOutputs = mergeIo(defaultIo('Q'), payload.o);
         window.stlJmriTransmitters = mergeIo(defaultTxRx('Z'), payload.t);
         window.stlJmriReceivers = mergeIo(defaultTxRx('Y'), payload.r);
+        // Rebuild friendly-name map from merged rows (fn payload key removed for URL size).
+        for (var ii = 0; ii < window.stlJmriInputs.length; ii++) {
+          var ir = window.stlJmriInputs[ii];
+          if (ir[1] && String(ir[1]).trim()) window.stlFriendlyNames[ir[0]] = String(ir[1]).trim();
+        }
+        for (var oi = 0; oi < window.stlJmriOutputs.length; oi++) {
+          var or = window.stlJmriOutputs[oi];
+          if (or[1] && String(or[1]).trim()) window.stlFriendlyNames[or[0]] = String(or[1]).trim();
+        }
         if (payload.i || payload.o || payload.t || payload.r) addVariableBlocksFromBackup(ws);
         if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length && window.getStlLogicVarOptions) refreshBlockVarOptions(ws);
       }
@@ -1894,7 +1898,28 @@
       }
       function performShare(feedbackEl) {
         updateStl();
-        var payload = buildSharePayload();
+        var compactStl = formatStl(lastCode || '', 'compact');
+        var readableStl = formatStl(lastCode || '', 'readable');
+        function getSharePack(useReadable) {
+          var stlForShare = useReadable ? readableStl : compactStl;
+          var payload = buildSharePayload(stlForShare);
+          if (!payload) return null;
+          var fullEncoded = compressStr(JSON.stringify(payload));
+          var namesPayload = buildSharePayloadNamesOnly(stlForShare);
+          var namesEncoded = namesPayload ? compressStr(JSON.stringify(namesPayload)) : '';
+          var stlEncoded = compressStr(stlForShare);
+          return {
+            payload: payload,
+            fullEncoded: fullEncoded,
+            namesEncoded: namesEncoded,
+            stlEncoded: stlEncoded,
+            fullFits: fullEncoded.length <= SHARE_URL_MAX,
+            namesFits: namesEncoded.length > 0 && namesEncoded.length <= SHARE_URL_MAX,
+            stlFits: stlEncoded.length > 0 && stlEncoded.length <= SHARE_URL_MAX
+          };
+        }
+        var compactPack = getSharePack(false);
+        var payload = compactPack && compactPack.payload;
         if (!payload) {
           if (feedbackEl) {
             feedbackEl.setAttribute('title', 'Workspace is empty');
@@ -1907,14 +1932,12 @@
         function buildShareUrl(paramName, encodedValue) {
           return base + '?' + paramName + '=' + encodedValue + '&cb=' + shareCacheBuster;
         }
-        var fullEncoded = compressStr(JSON.stringify(payload));
-        var namesPayload = buildSharePayloadNamesOnly();
-        var namesEncoded = namesPayload ? compressStr(JSON.stringify(namesPayload)) : '';
-        var stl = getFormattedStl();
-        var stlEncoded = (stl && stl.indexOf('// No blocks') !== 0) ? compressStr(stl) : '';
-        var fullFits = fullEncoded.length <= SHARE_URL_MAX;
-        var namesFits = namesEncoded.length > 0 && namesEncoded.length <= SHARE_URL_MAX;
-        var stlFits = stlEncoded.length > 0 && stlEncoded.length <= SHARE_URL_MAX;
+        var fullEncoded = compactPack.fullEncoded;
+        var namesEncoded = compactPack.namesEncoded;
+        var stlEncoded = compactPack.stlEncoded;
+        var fullFits = compactPack.fullFits;
+        var namesFits = compactPack.namesFits;
+        var stlFits = compactPack.stlFits;
 
         function hasEventIds(p) {
           if (!p) return false;
@@ -1938,30 +1961,9 @@
         }
         var showFull = hasEventIds(payload) && fullFits;
         var showNames = hasNames(payload) && namesFits;
-        var onlyStlOption = !showFull && !showNames && stlFits;
-
-        if (onlyStlOption) {
-          var stlUrl = buildShareUrl('stl', stlEncoded);
-          navigator.clipboard.writeText(stlUrl).then(function () {
-            if (feedbackEl) {
-              feedbackEl.classList.add('copy-success');
-              if (feedbackEl.id === 'btnShare') {
-                feedbackEl.textContent = 'Copied!';
-                setTimeout(function () { feedbackEl.textContent = 'Share'; }, 1500);
-              }
-              setTimeout(function () { feedbackEl.classList.remove('copy-success'); }, 1500);
-            }
-          }, function () {
-            if (feedbackEl) {
-              feedbackEl.setAttribute('title', 'Copy failed');
-              setTimeout(function () { feedbackEl.setAttribute('title', 'Copy share link'); }, 2000);
-            }
-          });
-          return;
-        }
         if (!fullFits && !namesFits && !stlFits) {
           messageModalTitle.textContent = 'Share';
-          messageModalBody.textContent = 'STL is also too large (' + ((stlEncoded.length / 1024).toFixed(1)) + ' KB). Use Download to save as a file and share that instead.';
+          messageModalBody.textContent = 'Too large for a link. Download as a file and share that instead.';
           messageModalActions.innerHTML = '';
           var okBtn = document.createElement('button');
           okBtn.type = 'button';
@@ -1977,61 +1979,150 @@
         messageModalTitle.textContent = 'Share';
         var limitKb = (SHARE_URL_MAX / 1024).toFixed(1);
         if (showFull || showNames) {
-          messageModalBody.textContent = fullFits ? 'Choose what to include in the link (limit ~' + limitKb + ' KB).' : 'Full payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Choose an option below.';
+          messageModalBody.textContent = fullFits ? 'Copy a link:' : 'Full link too big. Use an option below.';
         } else {
-          messageModalBody.textContent = 'Payload is ' + (fullEncoded.length / 1024).toFixed(1) + ' KB (limit ~' + limitKb + ' KB). Copy link with STL only.';
+          messageModalBody.textContent = 'Copy STL-only link below.';
         }
         messageModalActions.innerHTML = '';
+        messageModalActions.style.flexDirection = 'column';
+        messageModalActions.style.gap = '0.75rem';
+        messageModalActions.style.alignItems = 'stretch';
 
-        function addFullBtn() {
+        var readableToggle = document.createElement('input');
+        readableToggle.type = 'checkbox';
+        readableToggle.checked = true;
+
+        function getActivePack() {
+          return getSharePack(!!readableToggle.checked) || compactPack;
+        }
+        function sizeLabel(encodedLen) {
+          return '(' + (encodedLen / 1024).toFixed(1) + ' KB)';
+        }
+        var fullBtnRef = null;
+        var namesBtnRef = null;
+        var stlBtnRef = null;
+        function setBtnLabelAndSize(btn, label, sizeStr) {
+          var labelEl = btn.querySelector('.share-btn-label') || btn.firstElementChild;
+          var sizeEl = btn.querySelector('.share-btn-size') || btn.lastElementChild;
+          if (labelEl) labelEl.textContent = label;
+          if (sizeEl) {
+            sizeEl.textContent = sizeStr;
+            sizeEl.style.display = sizeStr ? 'block' : 'none';
+          }
+        }
+        function updateShareButtonLabels() {
+          var pack = getActivePack();
+          if (fullBtnRef) setBtnLabelAndSize(fullBtnRef, fullBtnRef.dataset.shareLabel || 'Full', sizeLabel(pack.fullEncoded.length));
+          if (namesBtnRef) setBtnLabelAndSize(namesBtnRef, namesBtnRef.dataset.shareLabel || 'Names only', sizeLabel(pack.namesEncoded.length));
+          if (stlBtnRef) setBtnLabelAndSize(stlBtnRef, stlBtnRef.dataset.shareLabel || 'STL only', sizeLabel(pack.stlEncoded.length));
+        }
+
+        var buttonsRow = document.createElement('div');
+        buttonsRow.style.display = 'flex';
+        buttonsRow.style.gap = '0.5rem';
+        buttonsRow.style.minWidth = '0';
+
+        function makeShareBtn(label) {
           var btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = 'primary';
-          btn.textContent = 'Copy link (logic + names + event IDs)';
+          btn.dataset.shareLabel = label;
+          var labelSpan = document.createElement('span');
+          labelSpan.className = 'share-btn-label';
+          labelSpan.textContent = label;
+          var sizeSpan = document.createElement('span');
+          sizeSpan.className = 'share-btn-size';
+          sizeSpan.style.display = 'block';
+          sizeSpan.style.fontSize = '0.85em';
+          sizeSpan.style.color = 'var(--muted)';
+          btn.appendChild(labelSpan);
+          btn.appendChild(sizeSpan);
+          btn.style.flex = '1 1 0';
+          btn.style.minWidth = '0';
+          btn.style.overflow = 'hidden';
+          return btn;
+        }
+        function addFullBtn() {
+          var btn = makeShareBtn('Full');
+          fullBtnRef = btn;
           btn.onclick = function () {
-            var url = buildShareUrl('d', fullEncoded);
-            navigator.clipboard.writeText(url).then(function () {
-              btn.textContent = 'Copied!';
-              setTimeout(function () { btn.textContent = 'Copy link (logic + names + event IDs)'; }, 1500);
+            var pack = getActivePack();
+            if (!pack.fullFits) {
+              setBtnLabelAndSize(btn, 'Too large', '');
+              setTimeout(updateShareButtonLabels, 1500);
+              return;
+            }
+            navigator.clipboard.writeText(buildShareUrl('d', pack.fullEncoded)).then(function () {
+              setBtnLabelAndSize(btn, 'Copied!', '');
+              setTimeout(updateShareButtonLabels, 1500);
             });
           };
-          messageModalActions.appendChild(btn);
+          buttonsRow.appendChild(btn);
         }
         function addNamesOnlyBtn() {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = showFull ? '' : 'primary';
-          btn.textContent = 'Copy link with names (no event IDs)';
+          var btn = makeShareBtn('Names only');
+          namesBtnRef = btn;
           btn.onclick = function () {
-            var url = buildShareUrl('d', namesEncoded);
-            navigator.clipboard.writeText(url).then(function () {
-              btn.textContent = 'Copied!';
-              setTimeout(function () { btn.textContent = 'Copy link with names (no event IDs)'; }, 1500);
+            var pack = getActivePack();
+            if (!pack.namesFits) {
+              setBtnLabelAndSize(btn, 'Too large', '');
+              setTimeout(updateShareButtonLabels, 1500);
+              return;
+            }
+            navigator.clipboard.writeText(buildShareUrl('d', pack.namesEncoded)).then(function () {
+              setBtnLabelAndSize(btn, 'Copied!', '');
+              setTimeout(updateShareButtonLabels, 1500);
             });
           };
-          messageModalActions.appendChild(btn);
+          buttonsRow.appendChild(btn);
         }
         function addStlOnlyBtn() {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = 'Copy link with STL only';
+          var btn = makeShareBtn('STL only');
+          stlBtnRef = btn;
           btn.onclick = function () {
-            var url = buildShareUrl('stl', stlEncoded);
-            navigator.clipboard.writeText(url).then(function () {
-              btn.textContent = 'Copied!';
-              setTimeout(function () { btn.textContent = 'Copy link with STL only'; }, 1500);
+            var pack = getActivePack();
+            if (!pack.stlFits) {
+              setBtnLabelAndSize(btn, 'Too large', '');
+              setTimeout(updateShareButtonLabels, 1500);
+              return;
+            }
+            navigator.clipboard.writeText(buildShareUrl('stl', pack.stlEncoded)).then(function () {
+              setBtnLabelAndSize(btn, 'Copied!', '');
+              setTimeout(updateShareButtonLabels, 1500);
             });
           };
-          messageModalActions.appendChild(btn);
+          buttonsRow.appendChild(btn);
         }
         if (showFull) addFullBtn();
         if (showNames) addNamesOnlyBtn();
         addStlOnlyBtn();
+        updateShareButtonLabels();
+        readableToggle.addEventListener('change', updateShareButtonLabels);
+
+        var bottomRow = document.createElement('div');
+        bottomRow.style.display = 'flex';
+        bottomRow.style.alignItems = 'center';
+        bottomRow.style.justifyContent = 'space-between';
+        bottomRow.style.gap = '0.5rem';
+        bottomRow.style.width = '100%';
+
+        var commentsLabel = document.createElement('label');
+        commentsLabel.style.display = 'flex';
+        commentsLabel.style.alignItems = 'center';
+        commentsLabel.style.gap = '0.4rem';
+        commentsLabel.style.fontSize = '0.78rem';
+        commentsLabel.style.color = 'var(--muted)';
+        commentsLabel.appendChild(readableToggle);
+        commentsLabel.appendChild(document.createTextNode('Comments'));
+        bottomRow.appendChild(commentsLabel);
+
         var okBtn = document.createElement('button');
         okBtn.type = 'button';
         okBtn.textContent = 'OK';
         okBtn.onclick = closeMessageModal;
-        messageModalActions.appendChild(okBtn);
+        bottomRow.appendChild(okBtn);
+
+        messageModalActions.appendChild(buttonsRow);
+        messageModalActions.appendChild(bottomRow);
         messageModal.classList.add('visible');
         messageModal.setAttribute('aria-hidden', 'false');
       }
