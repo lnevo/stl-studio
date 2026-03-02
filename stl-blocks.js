@@ -122,7 +122,7 @@
       previousStatement: null,
       nextStatement: null,
       colour: 180,
-      tooltip: 'Check whether a sensor, output, or memory bit is ON or OFF. Use the dropdown to choose how this check combines with the ones above: AND (all must be true), OR (any can be true), AND NOT (this must be OFF), OR NOT (this being OFF is enough). The label on the left updates automatically.',
+      tooltip: 'Check whether a sensor, output, or memory bit is ON or OFF. Use the dropdown to choose how this check combines with the ones above: AND (all must be true), OR (any can be true), AND NOT (this must be OFF), OR NOT (this being OFF is enough).',
     },
     {
       type: 'stl_xor',
@@ -135,7 +135,7 @@
       previousStatement: null,
       nextStatement: null,
       colour: 180,
-      tooltip: 'Exclusive OR check. "OR" is true only when exactly one of the two things is active (not both). "OR NOT (must match)" is true when both agree — both ON or both OFF. The label on the left updates automatically.',
+      tooltip: 'Exclusive OR check. "OR" is true only when exactly one of the two things is active (not both). "OR NOT (must match)" is true when both agree — both ON or both OFF.',
     },
     {
       type: 'stl_not',
@@ -173,7 +173,7 @@
       previousStatement: null,
       nextStatement: null,
       colour: 0,
-      tooltip: 'Latches an output or memory bit ON or OFF. "ON (latch)" turns it ON and keeps it ON until reset — pair with an "OFF / reset" block to unlatch. "OFF / reset" turns it OFF or resets a timer. The label on the left updates automatically.',
+      tooltip: 'Latches an output or memory bit ON or OFF. "ON (latch)" turns it ON and keeps it ON until reset — pair with an "OFF / reset" block to unlatch. "OFF / reset" turns it OFF or resets a timer.',
     },
     {
       type: 'stl_l',
@@ -207,7 +207,7 @@
       previousStatement: null,
       nextStatement: null,
       colour: 200,
-      tooltip: 'Starts a timer. Choose the type from the dropdown: On-delay (wait before acting), Off-delay (keep output on after input drops), Pulse (timed output), Extended pulse (guaranteed minimum duration), or Accumulating (total elapsed time). Always place a [L] Load time preset block directly above this block. The label on the left updates automatically.',
+      tooltip: 'Starts a timer. Choose the type from the dropdown: On-delay (wait before acting), Off-delay (keep output on after input drops), Pulse (timed output), Extended pulse (guaranteed minimum duration), or Accumulating (total elapsed time). Always place a [L] Load time preset block directly above this block.',
     },
     {
       type: 'stl_fr',
@@ -265,7 +265,7 @@
       ],
       message1: '  %1',
       args1: [{ type: 'input_statement', name: 'BODY' }],
-      message2: '  [lands at label:] %1',
+      message2: '  [label:] %1',
       args2: [{ type: 'field_label', name: 'LABEL_DISPLAY', text: 'E1' }],
       previousStatement: null,
       nextStatement: null,
@@ -285,13 +285,15 @@
     },
     {
       type: 'stl_nest_c',
-      message0: '%1 %2 nest ( … )',
+      message0: '%1 %2 (',
       args0: [
-        { type: 'field_label', name: 'OPCODE_LABEL', text: '[O(]' },
+        { type: 'field_label', name: 'OPCODE_LABEL', text: 'O' },
         { type: 'field_dropdown', name: 'NEST_TYPE', options: NEST_TYPE_OPTS }
       ],
       message1: '  %1',
       args1: [{ type: 'input_statement', name: 'BODY' }],
+      message2: ')',
+      args2: [],
       previousStatement: null,
       nextStatement: null,
       colour: '#c47c30',
