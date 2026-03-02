@@ -102,6 +102,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Resets the condition to “false” so you can start a brand-new check. Place this at the top of a new logic sequence when you do not want it to carry over from the previous block.',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_set',
@@ -110,6 +111,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Forces the condition to true, regardless of sensor states. Use before an output or jump that should always run, with no conditions attached.',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_logic',
@@ -123,6 +125,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Check whether a sensor, output, or memory bit is ON or OFF. Use the dropdown to choose how this check combines with the ones above: AND (all must be true), OR (any can be true), AND NOT (this must be OFF), OR NOT (this being OFF is enough).',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_xor',
@@ -136,6 +139,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Exclusive OR check. "OR" is true only when exactly one of the two things is active (not both). "OR NOT (must match)" is true when both agree — both ON or both OFF.',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_not',
@@ -144,6 +148,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Flips the current result: true becomes false, false becomes true. Place this before an output or jump to apply the opposite of the condition above.',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_save',
@@ -152,6 +157,7 @@
       nextStatement: null,
       colour: 180,
       tooltip: 'Advanced: saves the current condition so it can be tested later by a JBI, JNBI, JCB, or JNB jump. Place this block directly above the jump block that needs to use the saved value.',
+      helpUrl: 'help.html#cat-logic',
     },
     {
       type: 'stl_assign',
@@ -161,6 +167,7 @@
       nextStatement: null,
       colour: 0,
       tooltip: 'Sets this output ON or OFF based on the checks above. If the conditions are true, the output turns ON; if false, it turns OFF. This is the most common way to control a signal or output.',
+      helpUrl: 'help.html#cat-outputs',
     },
     {
       type: 'stl_latch',
@@ -174,6 +181,7 @@
       nextStatement: null,
       colour: 0,
       tooltip: 'Latches an output or memory bit ON or OFF. "ON (latch)" turns it ON and keeps it ON until reset — pair with an "OFF / reset" block to unlatch. "OFF / reset" turns it OFF or resets a timer.',
+      helpUrl: 'help.html#cat-outputs',
     },
     {
       type: 'stl_l',
@@ -183,6 +191,7 @@
       nextStatement: null,
       colour: 200,
       tooltip: 'Advanced: loads a raw timer value in the internal format (e.g. W#1#50). For most uses, prefer the [L] Load time preset block below which is easier to configure.',
+      helpUrl: 'help.html#cat-timers',
     },
     {
       type: 'stl_l_time',
@@ -195,6 +204,7 @@
       nextStatement: null,
       colour: 200,
       tooltip: 'Sets the time duration for a timer. Enter a number and choose the unit (e.g. 5 \u00d7 1 s = 5 seconds). Always place this block directly above the Start timer block (SD, SE, SP, SS, or SF).',
+      helpUrl: 'help.html#cat-timers',
     },
     {
       type: 'stl_timer',
@@ -208,6 +218,7 @@
       nextStatement: null,
       colour: 200,
       tooltip: 'Starts a timer. Choose the type from the dropdown: On-delay (wait before acting), Off-delay (keep output on after input drops), Pulse (timed output), Extended pulse (guaranteed minimum duration), or Accumulating (total elapsed time). Always place a [L] Load time preset block directly above this block.',
+      helpUrl: 'help.html#cat-timers',
     },
     {
       type: 'stl_fr',
@@ -217,6 +228,7 @@
       nextStatement: null,
       colour: 200,
       tooltip: 'Enables a timer so it can restart after being reset. Place this just above the timer start block (SD, SE, SP, SS, or SF) in the same group if the timer stops working after a reset.',
+      helpUrl: 'help.html#cat-timers',
     },
     {
       type: 'stl_transition',
@@ -230,6 +242,7 @@
       nextStatement: null,
       colour: '#b8a83a',
       tooltip: 'Detects a change on a memory bit \u2014 true for just one program cycle at the moment of the transition. "OFF\u2192ON" triggers when the bit first turns on; "ON\u2192OFF" triggers when it first turns off. Use for one-shot actions (e.g. fire an action the instant a sensor activates or clears).',
+      helpUrl: 'help.html#cat-transition',
     },
     {
       type: 'stl_label',
@@ -241,6 +254,7 @@
       nextStatement: null,
       colour: 120,
       tooltip: 'Marks a point in the program that a Jump block can branch to. Give it a short name up to 4 characters (e.g. E1). Place it above the logic you want to loop back to, or use the C-shaped Jump block when the label goes below the jump.',
+      helpUrl: 'help.html#cat-jumps',
     },
     {
       type: 'stl_jump',
@@ -254,6 +268,7 @@
       nextStatement: null,
       colour: 120,
       tooltip: 'Jumps to a label block elsewhere in the program. Choose when to jump using the dropdown: Always, if the condition is ON or OFF, or using a previously saved value. Use this when the label is above the jump (e.g. loop back). For “skip a section if a condition is met” use the C-shaped jump block instead.',
+      helpUrl: 'help.html#cat-jumps',
     },
     {
       type: 'stl_jump_c',
@@ -271,6 +286,7 @@
       nextStatement: null,
       colour: 120,
       tooltip: 'Runs the blocks inside only if the jump condition is met, then continues at the label shown at the bottom. Use for "if condition, skip this section" logic. The landing label is built in — no separate label block needed.',
+      helpUrl: 'help.html#cat-jumps',
     },
     {
       type: 'stl_comment',
@@ -282,6 +298,7 @@
       nextStatement: null,
       colour: 230,
       tooltip: 'Adds a note or description in the program — has no effect on logic. Use to explain what a section does. Note: avoid using timer names (T0–T63) as plain text in comments.',
+      helpUrl: 'help.html#cat-groups',
     },
     {
       type: 'stl_nest_c',
@@ -298,6 +315,7 @@
       nextStatement: null,
       colour: '#c47c30',
       tooltip: 'Groups a set of checks together like parentheses in math. All checks inside are evaluated as a unit, then combined with the checks outside using the chosen operator (OR, AND, etc.). Example: "(sensor A OR sensor B) AND sensor C".',
+      helpUrl: 'help.html#cat-nesting',
     },
     {
       type: 'stl_group',
@@ -312,6 +330,7 @@
       nextStatement: null,
       colour: 230,
       tooltip: 'Names a logic group (e.g. “East Signal” or “Crossing Gate”). Each group can hold up to 256 bytes of logic — the byte count shows how full it is. Place this block at the very top of each group’s logic.',
+      helpUrl: 'help.html#cat-groups',
     },
     {
       type: 'stl_var_input',
@@ -325,6 +344,7 @@
       nextStatement: ['stl_var_input'],
       colour: 260,
       tooltip: 'Name this input (e.g. “West approach”) for reference and for JMRI export. Optionally attach Event ID blocks for true/false. Stacks with other Input blocks; order is used when exporting inputs.',
+      helpUrl: 'help.html#variables',
     },
     {
       type: 'stl_var_output',
@@ -338,6 +358,7 @@
       nextStatement: ['stl_var_output'],
       colour: 260,
       tooltip: 'Name this output (e.g. “Signal head”) for reference and for JMRI export. Optionally attach Event ID blocks for true/false. Stacks with other Output blocks; order is used when exporting outputs.',
+      helpUrl: 'help.html#variables',
     },
     {
       type: 'stl_var_transmitter',
@@ -351,6 +372,7 @@
       nextStatement: ['stl_var_transmitter'],
       colour: 260,
       tooltip: 'Name this transmitter circuit for reference and for JMRI export. Optionally attach Event ID blocks. Stacks with other Transmitter blocks; order is used when exporting transmitters.',
+      helpUrl: 'help.html#variables',
     },
     {
       type: 'stl_var_receiver',
@@ -364,6 +386,7 @@
       nextStatement: ['stl_var_receiver'],
       colour: 260,
       tooltip: 'Name this receiver circuit for reference and for JMRI export. Optionally attach Event ID blocks. Stacks with other Receiver blocks; order is used when exporting receivers.',
+      helpUrl: 'help.html#variables',
     },
     {
       type: 'stl_event_id',
@@ -375,6 +398,7 @@
       output: 'String',
       colour: 160,
       tooltip: 'Enter the LCC event IDs for “when true” and “when false”. Plugs into the right socket of an Input, Output, Transmitter, or Receiver block; used when exporting CSV for JMRI.',
+      helpUrl: 'help.html#variables',
     },
   ]);
 

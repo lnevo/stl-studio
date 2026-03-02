@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STL Studio – Help & Reference</title>
+  <style>
+    :root {
+      --bg: #1a1d23;
+      --panel: #22262e;
+      --border: #2e3340;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+      --orange: #fb923c;
+      --red: #f87171;
+      --purple: #a78bfa;
+      --teal: #2dd4bf;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.65;
+    }
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+    nav {
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      width: 220px; flex-shrink: 0;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 1.25rem 0;
+    }
+    nav .nav-brand {
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--muted);
+      padding: 0 1.25rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+    }
+    nav a {
+      display: block; padding: 0.3rem 1.25rem;
+      color: var(--muted); text-decoration: none; font-size: 0.875rem;
+      border-left: 2px solid transparent;
+    }
+    nav a:hover { color: var(--text); }
+    nav a.active { color: var(--green); border-left-color: var(--green); }
+    nav .nav-section { padding: 0.65rem 1.25rem 0.2rem; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: .08em; color: var(--border); }
+    main {
+      flex: 1; min-width: 0;
+      padding: 2.5rem clamp(1rem, 4vw, 3rem);
+      max-width: 860px;
+    }
+    /* ── Typography ── */
+    h1 { font-size: 2rem; color: var(--green); margin-bottom: 0.4rem; }
+    h2 { font-size: 1.4rem; color: var(--blue); margin: 2.5rem 0 0.75rem;
+         padding-top: 0.5rem; border-top: 1px solid var(--border); }
+    h3 { font-size: 1.05rem; color: var(--yellow); margin: 1.5rem 0 0.4rem; }
+    h4 { font-size: 0.95rem; color: var(--orange); margin: 1.1rem 0 0.3rem; }
+    p { margin-bottom: 0.75rem; }
+    ul, ol { margin: 0.4rem 0 0.75rem 1.4rem; }
+    li { margin-bottom: 0.25rem; }
+    a { color: var(--blue); }
+    a:hover { color: var(--text); }
+    /* ── Code ── */
+    code {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 3px; padding: 0.1em 0.4em;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: 0.875em; color: var(--green);
+    }
+    pre {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 1rem 1.25rem;
+      overflow-x: auto; margin: 0.5rem 0 1rem;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: 0.85rem; line-height: 1.6; color: var(--green);
+    }
+    pre .c { color: var(--muted); }
+    pre .op { color: var(--blue); }
+    pre .lbl { color: var(--yellow); }
+    /* ── Tables ── */
+    table {
+      width: 100%; border-collapse: collapse;
+      margin: 0.5rem 0 1.25rem; font-size: 0.875rem;
+    }
+    th {
+      background: var(--panel); color: var(--muted);
+      text-align: left; padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: .05em;
+    }
+    td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    td code { border: none; background: transparent; padding: 0; }
+    /* ── Callouts ── */
+    .tip, .warn, .note {
+      border-left: 3px solid;
+      padding: 0.6rem 1rem; margin: 0.75rem 0 1rem;
+      border-radius: 0 6px 6px 0; font-size: 0.9rem;
+    }
+    .tip  { border-color: var(--green);  background: rgba(74,222,128,.07); }
+    .warn { border-color: var(--yellow); background: rgba(251,191,36,.07); }
+    .note { border-color: var(--blue);   background: rgba(96,165,250,.07); }
+    .tip strong  { color: var(--green); }
+    .warn strong { color: var(--yellow); }
+    .note strong { color: var(--blue); }
+    /* ── Block badge ── */
+    .badge {
+      display: inline-block; padding: 0.1em 0.5em;
+      border-radius: 4px; font-size: 0.78em; font-weight: 700;
+      font-family: ui-monospace, monospace; vertical-align: middle;
+    }
+    .logic    { background: rgba(96,165,250,.2);  color: var(--blue); }
+    .output   { background: rgba(74,222,128,.2);  color: var(--green); }
+    .jump     { background: rgba(251,191,36,.2);  color: var(--yellow); }
+    .timer    { background: rgba(251,146,60,.2);  color: var(--orange); }
+    .nest     { background: rgba(196,124,48,.2);  color: #e8954a; }
+    .misc     { background: rgba(167,139,250,.2); color: var(--purple); }
+    .trans    { background: rgba(45,212,191,.2);  color: var(--teal); }
+    /* ── Section ── */
+    section { margin-bottom: 1rem; }
+    .subtitle { color: var(--muted); font-size: 1rem; margin-bottom: 1.5rem; }
+    .toc-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+      gap: 0.5rem; margin: 1rem 0 2rem;
+    }
+    .toc-grid a {
+      display: block; padding: 0.5rem 0.75rem;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; text-decoration: none; color: var(--muted);
+      font-size: 0.85rem; transition: border-color .15s, color .15s;
+    }
+    .toc-grid a:hover { border-color: var(--green); color: var(--text); }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ─────────────── NAV ─────────────── -->
+<nav id="sidenav">
+  <div class="nav-brand">STL Studio Help</div>
+  <div class="nav-section">Getting Started</div>
+  <a href="#intro">What is STL Studio?</a>
+  <a href="#quickstart">Quick Start</a>
+  <a href="#workspace">The Workspace</a>
+  <a href="#variables">Variables & Addresses</a>
+  <div class="nav-section">How STL Works</div>
+  <a href="#rlo">RLO &amp; Logic Strings</a>
+  <a href="#program-cycle">Program Cycle</a>
+  <div class="nav-section">Block Reference</div>
+  <a href="#cat-logic">Logic (RLO)</a>
+  <a href="#cat-nesting">Nesting</a>
+  <a href="#cat-outputs">Outputs</a>
+  <a href="#cat-transition">Transition (Edges)</a>
+  <a href="#cat-timers">Timers</a>
+  <a href="#cat-jumps">Jumps &amp; Labels</a>
+  <a href="#cat-groups">Groups &amp; Comments</a>
+  <div class="nav-section">Tutorials</div>
+  <a href="#tut-signal">Simple Signal Logic</a>
+  <a href="#tut-timer">Delayed Output</a>
+  <a href="#tut-latch">Latch / Memory</a>
+  <a href="#tut-nesting">Grouped Conditions</a>
+  <div class="nav-section">Tips & Limits</div>
+  <a href="#limits">Byte Limits</a>
+  <a href="#tips">Tips &amp; Gotchas</a>
+  <a href="#ref">External References</a>
+</nav>
+
+<!-- ─────────────── MAIN ─────────────── -->
+<main>
+
+<!-- ══════════ INTRO ══════════ -->
+<h1>STL Studio – Help &amp; Reference</h1>
+<p class="subtitle">A visual editor for Tower LCC+Q logic programming</p>
+
+<div class="toc-grid">
+  <a href="#quickstart">🚀 Quick Start</a>
+  <a href="#rlo">⚡ How RLO Works</a>
+  <a href="#cat-logic">🔵 Logic blocks</a>
+  <a href="#cat-nesting">🟤 Nesting blocks</a>
+  <a href="#cat-outputs">🟢 Output blocks</a>
+  <a href="#cat-timers">🟠 Timer blocks</a>
+  <a href="#cat-jumps">🟡 Jump blocks</a>
+  <a href="#tut-signal">📖 Tutorials</a>
+</div>
+
+<section id="intro">
+<h2>What is STL Studio?</h2>
+<p>STL Studio is a visual, block-based editor for writing <strong>STL (Statement List)</strong> logic programs for the <strong>Tower LCC+Q</strong> — a 16-channel I/O board that adds PLC-style logic to any NMRA LCC layout.</p>
+<p>Instead of typing STL by hand (which is error-prone), you drag and connect blocks. The editor generates the exact STL text you paste into your Tower LCC+Q node via JMRI's <em>Configure Nodes → Conditionals → Logic</em>.</p>
+<p>The Tower LCC+Q implements a subset of the <strong>Siemens S7 STL language</strong>. It supports only boolean (true/false) operations — no math, no counters, no analog values. But that's all you need for signals, crossings, interlockings, and most layout automation.</p>
+</section>
+
+<!-- ══════════ QUICK START ══════════ -->
+<section id="quickstart">
+<h2>Quick Start</h2>
+<ol>
+  <li><strong>Open the editor</strong> at <a href="https://lnevo.github.io/stl-studio" target="_blank">lnevo.github.io/stl-studio</a></li>
+  <li><strong>Load your node's variable names</strong> (optional but recommended): click <em>Import Config…</em> and paste your node's config backup. The editor will populate friendly names for I/Q/M/Y/Z variables.</li>
+  <li><strong>Drag blocks</strong> from the left panel into the workspace. Blocks snap together vertically — the order they appear top-to-bottom is the order they execute.</li>
+  <li><strong>Read the STL output</strong> in the right panel — it updates live as you edit. Turn on <em>Split view</em> for a side-by-side raw + plain-English explanation.</li>
+  <li><strong>Copy to clipboard</strong> and paste into JMRI: <em>LCC → Configure Nodes → [your node] → Conditionals → Logic (group N) → MultiLine</em>. Click <em>Write</em> then reboot the node.</li>
+</ol>
+
+<div class="tip"><strong>Tip:</strong> The node stores up to 16 logic groups, each with 256 characters. The byte count bar in the editor shows you how full each group is.</div>
+</section>
+
+<!-- ══════════ WORKSPACE ══════════ -->
+<section id="workspace">
+<h2>The Workspace</h2>
+<h3>Left panel — block toolbox</h3>
+<p>Blocks are organised into categories. Click a category to expand it, then drag a block into the canvas. Use the search box at the top to find a block by name.</p>
+<table>
+  <thead><tr><th>Category</th><th>What's inside</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge logic">Logic</span></td><td>Boolean conditions: AND, OR, AND-NOT, OR-NOT, Exclusive-OR, NOT, CLR, SET, SAVE</td></tr>
+    <tr><td><span class="badge nest">Nesting</span></td><td>Grouped sub-expressions: <code>A(</code>, <code>O(</code>, <code>AN(</code>, <code>ON(</code>, <code>X(</code>, <code>XN(</code></td></tr>
+    <tr><td><span class="badge output">Outputs</span></td><td>Assign result to Q/M/Z: <code>=</code>, Latch ON (<code>S</code>), Latch OFF (<code>R</code>)</td></tr>
+    <tr><td><span class="badge trans">Transition</span></td><td>Detect rising/falling edge: <code>FP</code>, <code>FN</code></td></tr>
+    <tr><td><span class="badge timer">Timers</span></td><td>Load time (<code>L</code>), On-delay (<code>SD</code>), Pulse (<code>SP</code>), Extended-pulse (<code>SE</code>), Retentive (<code>SS</code>), Off-delay (<code>SF</code>), Free/Enable (<code>FR</code>)</td></tr>
+    <tr><td><span class="badge jump">Jumps</span></td><td>Jump unconditional/conditional (<code>JU</code>, <code>JC</code>, <code>JCN</code>, …), Labels</td></tr>
+    <tr><td><span class="badge misc">Comments</span></td><td>Free-text comment lines (<code>//</code>)</td></tr>
+    <tr><td><span class="badge misc">Groups</span></td><td>Logic group header block (auto-numbered)</td></tr>
+  </tbody>
+</table>
+
+<h3>Right panel — STL output</h3>
+<ul>
+  <li><strong>Readable</strong> format adds spaces between operands for readability.</li>
+  <li><strong>Compact</strong> format omits all spaces — required if you're close to the 256-byte group limit.</li>
+  <li><strong>Split view</strong>: top pane shows raw STL; bottom pane shows each instruction with a plain-English explanation as a comment.</li>
+  <li><strong>Show line numbers</strong>: adds a line-number gutter. Numbers skip comment/blank lines.</li>
+  <li><strong>Byte count bar</strong>: tracks how many of the 256 characters are used. Goes amber near the limit, red if over.</li>
+</ul>
+
+<h3>Importing existing STL</h3>
+<p>Click <em>Import STL…</em>, paste your existing STL text (one statement per line, or compact inline), then click <em>Import into workspace</em>. The importer supports all standard instructions including compact, multi-statement lines.</p>
+</section>
+
+<!-- ══════════ VARIABLES ══════════ -->
+<section id="variables">
+<h2>Variables &amp; Addresses</h2>
+<p>All variables are boolean (true/false only). There are no integers, no analog values, no strings.</p>
+<table>
+  <thead><tr><th>Prefix</th><th>Name</th><th>Range</th><th>Direction</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>I</code></td><td>Logic Input</td><td>I0.0 – I15.7 (128)</td><td>Read-only</td><td>Driven by LCC events via consumers. Cannot be assigned by logic (<code>=</code>, <code>S</code>, <code>R</code> not allowed).</td></tr>
+    <tr><td><code>Q</code></td><td>Logic Output</td><td>Q0.0 – Q15.7 (128)</td><td>Write-only from logic</td><td>Changes produce LCC events. Cannot be changed by the network (only by logic).</td></tr>
+    <tr><td><code>M</code></td><td>Memory</td><td>M0.0 – M15.7 (128)</td><td>Read/Write</td><td>Internal scratch bits, invisible outside the node. No EventIDs.</td></tr>
+    <tr><td><code>Y</code></td><td>Track Receiver</td><td>Y0.0 – Y15.7</td><td>Read-only</td><td>Receives track-circuit speed codes from adjacent masts. Y0.0 = stop, Y0.7 = clear (suggested).</td></tr>
+    <tr><td><code>Z</code></td><td>Track Transmitter</td><td>Z0.0 – Z15.7</td><td>Write</td><td>Sends track-circuit speed codes to adjacent masts.</td></tr>
+    <tr><td><code>T</code></td><td>Timer</td><td>T0 – T63 (64)</td><td>Read/Write</td><td>Only usable with timer instructions. <strong>Never</strong> use T0–T63 in comments — the node may misinterpret them.</td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>Caution:</strong> You cannot <code>=</code> (assign), <code>S</code> (set), or <code>R</code> (reset) an <strong>I</strong> or <strong>Y</strong> variable — they are inputs only. You cannot send LCC events directly to a <strong>Q</strong> variable — it is output-only.</div>
+<div class="tip"><strong>Tip:</strong> Group addresses as <code>x.y</code> where <code>x</code> is 0–15 (group) and <code>y</code> is 0–7 (bit within group). So <code>I3.5</code> = input group 3, bit 5.</div>
+</section>
+
+<!-- ══════════ RLO ══════════ -->
+<section id="rlo">
+<h2>How STL Works — RLO &amp; Logic Strings</h2>
+<p>Understanding the <strong>RLO (Result of Logic Operation)</strong> is the key to writing correct STL. Think of the RLO as a single true/false value that flows through your instructions like water through a pipe.</p>
+
+<h3>The logic string</h3>
+<p>A <em>logic string</em> is a sequence of bit-logic instructions (<code>A</code>, <code>O</code>, <code>AN</code>, …) that builds up an RLO step by step, followed by a <em>terminating instruction</em> that uses or writes the result.</p>
+<ul>
+  <li>The <strong>first</strong> bit instruction in a string <em>sets</em> the RLO from its variable — it is <strong>not</strong> combined with any previous RLO.</li>
+  <li>Each subsequent bit instruction <em>combines</em> its variable with the current RLO using the operator (AND, OR, etc.).</li>
+  <li>A <strong>terminating instruction</strong> (<code>=</code>, <code>S</code>, <code>R</code>, <code>JC</code>, <code>CLR</code>, <code>SET</code>, or a timer start) consumes the RLO and resets it so the next bit instruction starts a fresh string.</li>
+</ul>
+
+<pre>
+<span class="op">A</span>   I1.0    <span class="c">// start new string: RLO = I1.0</span>
+<span class="op">AN</span>  I1.1    <span class="c">// AND with NOT I1.1</span>
+<span class="op">O</span>   M0.3    <span class="c">// OR with M0.3</span>
+<span class="op">=</span>   Q2.0    <span class="c">// write RLO to Q2.0; starts new string</span>
+<span class="op">=</span>   M0.0    <span class="c">// can assign same RLO to multiple outputs</span>
+</pre>
+
+<h3>NOT does not terminate</h3>
+<p><code>NOT</code> simply inverts the RLO in place — it does <strong>not</strong> end the logic string. The next bit instruction will still combine with (the now-inverted) RLO.</p>
+
+<h3>The /FC bit</h3>
+<p>Behind the scenes the node tracks a <em>/FC (Not First Check)</em> bit. When /FC = 0 the next bit instruction starts a fresh logic string. When /FC = 1 it combines with the running RLO. Terminating instructions reset /FC to 0. You never set this directly — it's automatic.</p>
+
+<h3>SAVE and the BR register</h3>
+<p><code>SAVE</code> copies the current RLO into the <strong>BR (Binary Result)</strong> register without terminating the logic string. This lets you carry a result forward across terminating instructions. The <code>JCB</code> and <code>JNB</code> jump instructions also set BR.</p>
+</section>
+
+<!-- ══════════ PROGRAM CYCLE ══════════ -->
+<section id="program-cycle">
+<h2>Program Cycle</h2>
+<p>The Tower LCC+Q re-evaluates all logic <strong>every 20 ms</strong> in a continuous loop. This means:</p>
+<ul>
+  <li>Logic outputs (<code>Q</code>) fire LCC events only when their value <em>changes</em> — not on every scan.</li>
+  <li>An input event that appears and disappears in under 20 ms may be missed entirely.</li>
+  <li>Jumps are forward-only. The logic never loops back (no infinite loops possible).</li>
+  <li>The logic executes up to 16 groups × 256 characters = 4,096 total characters per cycle.</li>
+</ul>
+<div class="note"><strong>Note:</strong> Timer instructions run off a separate hardware clock, not the 20 ms logic scan. A timer set for 500 ms will fire after 500 ms regardless of how many scan cycles pass.</div>
+</section>
+
+<!-- ══════════════════════════════════ -->
+<!--   BLOCK REFERENCE                  -->
+<!-- ══════════════════════════════════ -->
+
+<section id="cat-logic">
+<h2><span class="badge logic">Logic (RLO)</span> — Boolean Conditions</h2>
+<p>These blocks check the state of a variable and combine the result with the running RLO.</p>
+
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>AND</strong></td><td><code>A &lt;var&gt;</code></td>
+      <td>If <em>var</em> is ON (1), AND it with the current RLO. Both must be true for the result to be true.</td>
+    </tr>
+    <tr>
+      <td><strong>AND NOT</strong></td><td><code>AN &lt;var&gt;</code></td>
+      <td>Check that <em>var</em> is OFF (0), then AND with RLO. True when the variable is <em>not</em> active.</td>
+    </tr>
+    <tr>
+      <td><strong>OR</strong></td><td><code>O &lt;var&gt;</code></td>
+      <td>If <em>var</em> is ON, OR it with the current RLO. Either being true is enough.</td>
+    </tr>
+    <tr>
+      <td><strong>OR NOT</strong></td><td><code>ON &lt;var&gt;</code></td>
+      <td>Check that <em>var</em> is OFF, then OR with RLO.</td>
+    </tr>
+    <tr>
+      <td><strong>Exclusive OR</strong></td><td><code>X &lt;var&gt;</code></td>
+      <td>XOR: true when exactly one of the two (RLO or var) is true. Chaining multiple X instructions: true if an <em>odd</em> number are true.</td>
+    </tr>
+    <tr>
+      <td><strong>Exclusive OR NOT</strong></td><td><code>XN &lt;var&gt;</code></td>
+      <td>XOR NOT: like X but tests whether var is OFF.</td>
+    </tr>
+    <tr>
+      <td><strong>NOT</strong></td><td><code>NOT</code></td>
+      <td>Inverts (flips) the RLO. Does <em>not</em> terminate the logic string.</td>
+    </tr>
+    <tr>
+      <td><strong>CLR</strong></td><td><code>CLR</code></td>
+      <td>Forces the RLO to 0 (false). Starts a new logic string.</td>
+    </tr>
+    <tr>
+      <td><strong>SET</strong></td><td><code>SET</code></td>
+      <td>Forces the RLO to 1 (true). Starts a new logic string.</td>
+    </tr>
+    <tr>
+      <td><strong>SAVE</strong></td><td><code>SAVE</code></td>
+      <td>Saves the current RLO into the BR register without ending the string. Used to carry a result past a terminating instruction.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>Example — simple AND condition</h4>
+<pre>
+<span class="op">A</span>   I0.0    <span class="c">// Block occupancy sensor is active</span>
+<span class="op">AN</span>  I0.1    <span class="c">// AND facing-point lever is NOT in position</span>
+<span class="op">=</span>   Q1.0    <span class="c">// Set signal to Stop</span>
+</pre>
+</section>
+
+<!-- ══════════ NESTING ══════════ -->
+<section id="cat-nesting">
+<h2><span class="badge nest">Nesting</span> — Grouped Sub-expressions</h2>
+<p>Nesting works like parentheses in algebra — it lets you group a set of conditions and combine the group's result with the outer logic. Up to 7 levels of nesting are allowed.</p>
+
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><strong>[A] AND ( … )</strong></td><td><code>A( … )</code></td><td>Evaluate the group; AND its result with the outer RLO.</td></tr>
+    <tr><td><strong>[AN] AND NOT ( … )</strong></td><td><code>AN( … )</code></td><td>Evaluate the group; AND NOT its result with the outer RLO.</td></tr>
+    <tr><td><strong>[O] OR ( … )</strong></td><td><code>O( … )</code></td><td>Evaluate the group; OR its result with the outer RLO.</td></tr>
+    <tr><td><strong>[ON] OR NOT ( … )</strong></td><td><code>ON( … )</code></td><td>Evaluate the group; OR NOT its result with the outer RLO.</td></tr>
+    <tr><td><strong>[X] XOR ( … )</strong></td><td><code>X( … )</code></td><td>Evaluate the group; XOR its result with the outer RLO.</td></tr>
+    <tr><td><strong>[XN] XOR NOT ( … )</strong></td><td><code>XN( … )</code></td><td>Evaluate the group; XOR NOT its result with the outer RLO.</td></tr>
+  </tbody>
+</table>
+
+<p>In the editor, each nesting block is a <strong>C-shaped container</strong>. Drop logic blocks inside the container; they are evaluated as a unit.</p>
+
+<h4>Example — route cleared when one of two routes is set AND no opposing train</h4>
+<pre>
+<span class="op">O</span>(
+  <span class="op">A</span>  I1.0    <span class="c">// Route A lever</span>
+  <span class="op">A</span>  I1.1    <span class="c">// Route A clear</span>
+<span class="op">O</span>(
+  <span class="op">A</span>  I1.2    <span class="c">// Route B lever</span>
+  <span class="op">A</span>  I1.3    <span class="c">// Route B clear</span>
+<span class="op">)</span>
+<span class="op">)</span>
+<span class="op">AN</span> I2.0     <span class="c">// AND no opposing train</span>
+<span class="op">=</span>  Q3.0     <span class="c">// Route cleared</span>
+</pre>
+</section>
+
+<!-- ══════════ OUTPUTS ══════════ -->
+<section id="cat-outputs">
+<h2><span class="badge output">Outputs</span> — Statement Termination</h2>
+<p>These instructions <em>consume</em> the current RLO, write its value to a variable, and reset the RLO so the next instruction starts a fresh logic string.</p>
+
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Assign <code>=</code></strong></td><td><code>= &lt;var&gt;</code></td>
+      <td><strong>Copies</strong> the RLO directly to the variable every scan. If RLO is true, var is true; if RLO goes false, var follows immediately. Multiple <code>=</code> blocks in a row all receive the same RLO.</td>
+    </tr>
+    <tr>
+      <td><strong>Latch ON <code>S</code></strong></td><td><code>S &lt;var&gt;</code></td>
+      <td><strong>Sets</strong> (latches) the variable to 1 when RLO = 1. The variable <em>stays</em> 1 even after the condition becomes false — until explicitly reset with <code>R</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Latch OFF <code>R</code></strong></td><td><code>R &lt;var&gt;</code></td>
+      <td><strong>Resets</strong> the variable to 0 when RLO = 1. Works on Q, M variables and also on timers (<code>R Tn</code> stops and clears a timer).</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Key difference:</strong> <code>=</code> tracks the condition continuously. <code>S</code>/<code>R</code> only <em>change</em> the output when the RLO first becomes 1 — they create a memory effect. Use <code>S</code>/<code>R</code> pairs when you need something to stay on even after the activating condition clears (e.g. an alarm latch).</div>
+
+<h4>Example — assign vs latch</h4>
+<pre>
+<span class="c">// Assign: signal follows sensor directly</span>
+<span class="op">A</span>   I0.0
+<span class="op">=</span>   Q0.0
+
+<span class="c">// Latch: set alarm when sensor fires; reset by button</span>
+<span class="op">A</span>   I0.1    <span class="c">// sensor</span>
+<span class="op">S</span>   M1.0    <span class="c">// latch alarm flag ON</span>
+<span class="op">A</span>   I0.2    <span class="c">// reset button</span>
+<span class="op">R</span>   M1.0    <span class="c">// clear alarm flag</span>
+</pre>
+</section>
+
+<!-- ══════════ TRANSITION ══════════ -->
+<section id="cat-transition">
+<h2><span class="badge trans">Transition</span> — Edge Detection</h2>
+<p>Edge instructions detect the <em>moment</em> the RLO changes state and produce a one-scan-cycle pulse (20 ms). They require a <strong>memory variable</strong> to store the previous state for comparison.</p>
+
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>FP</strong> (rising edge)</td><td><code>FP &lt;Mx.x&gt;</code></td>
+      <td>Sets RLO = 1 for exactly <strong>one scan cycle</strong> when the RLO transitions from 0 → 1. Stores the previous state in <em>Mx.x</em>.</td>
+    </tr>
+    <tr>
+      <td><strong>FN</strong> (falling edge)</td><td><code>FN &lt;Mx.x&gt;</code></td>
+      <td>Sets RLO = 1 for exactly <strong>one scan cycle</strong> when the RLO transitions from 1 → 0. Stores the previous state in <em>Mx.x</em>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="warn"><strong>Important:</strong> The memory variable used by FP/FN is <em>dedicated</em> to that edge detector. Do not use the same M address for two different FP/FN instructions, and do not use it for anything else — it stores internal state, not a real logic value.</div>
+
+<h4>Example — pulse output for one cycle when a sensor first activates</h4>
+<pre>
+<span class="op">A</span>   I2.0    <span class="c">// occupancy sensor</span>
+<span class="op">FP</span>  M2.0    <span class="c">// detect rising edge; store flag in M2.0</span>
+<span class="op">=</span>   Q2.0    <span class="c">// Q2.0 true for exactly 20ms on first activation</span>
+</pre>
+</section>
+
+<!-- ══════════ TIMERS ══════════ -->
+<section id="cat-timers">
+<h2><span class="badge timer">Timers</span></h2>
+<p>The Tower LCC+Q has 64 hardware timers, <code>T0</code>–<code>T63</code>. Timers must always be preceded by a <strong>Load (<code>L</code>)</strong> instruction that sets the time value.</p>
+
+<h3>Loading a timer value</h3>
+<p>The format is <code>L W#t#xyz</code> where:</p>
+<ul>
+  <li><code>t</code> = time base: <code>0</code> = 10 ms, <code>1</code> = 100 ms, <code>2</code> = 1 s, <code>3</code> = 10 s</li>
+  <li><code>xyz</code> = time value (decimal, up to 999)</li>
+</ul>
+<p>Examples: <code>L W#0#10</code> = 100 ms &nbsp;|&nbsp; <code>L W#1#5</code> = 500 ms &nbsp;|&nbsp; <code>L W#2#30</code> = 30 s</p>
+
+<h3>Timer types</h3>
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>Behaviour</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>SD</strong> On-delay</td><td><code>L … / SD Tn</code></td>
+      <td>Timer starts when RLO = 1. Output (T bit) goes true after the delay, stays true as long as RLO stays 1. Resets immediately when RLO goes 0.</td>
+    </tr>
+    <tr>
+      <td><strong>SE</strong> Extended pulse</td><td><code>L … / SE Tn</code></td>
+      <td>Timer starts on rising edge of RLO. Output stays true for the full preset time, regardless of whether the input (RLO) goes false. Retriggers if RLO goes true again during the pulse.</td>
+    </tr>
+    <tr>
+      <td><strong>SP</strong> Pulse</td><td><code>L … / SP Tn</code></td>
+      <td>Like SE but output goes false if RLO goes false before the time expires.</td>
+    </tr>
+    <tr>
+      <td><strong>SS</strong> Retentive on-delay</td><td><code>L … / SS Tn</code></td>
+      <td>Like SD but the elapsed time is <em>retained</em> if RLO goes false. Timing resumes from where it stopped when RLO goes true again. Must be explicitly reset with <code>R Tn</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>SF</strong> Off-delay</td><td><code>L … / SF Tn</code></td>
+      <td>Output goes true immediately when RLO goes 1. When RLO goes 0, output stays true for the preset time, then goes false. Useful for a "hold-off" after a condition clears.</td>
+    </tr>
+    <tr>
+      <td><strong>FR</strong> Enable/Free</td><td><code>FR Tn</code></td>
+      <td>Re-enables a running timer so it can be restarted. Not needed for initial start — only use FR when you need to re-trigger an already-running timer.</td>
+    </tr>
+    <tr>
+      <td><strong>R</strong> Reset timer</td><td><code>R Tn</code></td>
+      <td>Clears the timer and resets its output. Required to clear an SS timer. Also works on Q and M.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="tip"><strong>Tip:</strong> After a timer start instruction (<code>SD</code>, <code>SE</code>, etc.), the RLO is reset — the <em>next</em> instruction starts a new logic string. To check if a timer has finished, use <code>A Tn</code> (the T bit goes true when the timer has timed out).</div>
+
+<div class="warn"><strong>Caution:</strong> Never use timer names like <code>T1</code> or <code>T23</code> in comments. The node's compiler scans comments and may misinterpret them as timer references.</div>
+
+<h4>Example — SD on-delay (signal holds green for 5 seconds after train clears)</h4>
+<pre>
+<span class="op">A</span>   I1.0         <span class="c">// block occupancy</span>
+<span class="op">L</span>   W#2#5         <span class="c">// load 5 seconds</span>
+<span class="op">SD</span>  T1            <span class="c">// start on-delay timer T1</span>
+<span class="op">A</span>   T1            <span class="c">// check if timer has expired (new logic string)</span>
+<span class="op">=</span>   Q1.0          <span class="c">// output true after 5s of continuous occupancy</span>
+</pre>
+</section>
+
+<!-- ══════════ JUMPS ══════════ -->
+<section id="cat-jumps">
+<h2><span class="badge jump">Jumps &amp; Labels</span></h2>
+<p>Jump instructions let you skip over sections of logic based on the current RLO. Jumps are <strong>forward-only</strong> — you cannot jump backwards (no loops possible by design).</p>
+<p>A jump target is defined by a <strong>Label</strong> block (e.g. <code>E1:</code>). Labels must be 1–4 alphanumeric characters followed by a colon, and must appear at the start of a line. Labels cannot be in the middle of a logic string.</p>
+
+<table>
+  <thead><tr><th>Block</th><th>STL</th><th>When does it jump?</th></tr></thead>
+  <tbody>
+    <tr><td><strong>JU</strong> Jump always</td><td><code>JU &lt;label&gt;</code></td><td>Always — regardless of RLO.</td></tr>
+    <tr><td><strong>JC</strong> Jump if true</td><td><code>JC &lt;label&gt;</code></td><td>When RLO = 1 (condition is true). RLO is set to 1 after the jump (whether taken or not).</td></tr>
+    <tr><td><strong>JCN</strong> Jump if false</td><td><code>JCN &lt;label&gt;</code></td><td>When RLO = 0 (condition is false).</td></tr>
+    <tr><td><strong>JCB</strong> Jump if true + BR</td><td><code>JCB &lt;label&gt;</code></td><td>When RLO = 1. Also copies RLO into the BR register.</td></tr>
+    <tr><td><strong>JNB</strong> Jump if false + BR</td><td><code>JNB &lt;label&gt;</code></td><td>When RLO = 0. Also copies RLO into the BR register.</td></tr>
+    <tr><td><strong>JBI</strong> Jump if BR=1</td><td><code>JBI &lt;label&gt;</code></td><td>When the BR register = 1 (set by a previous SAVE/JCB/JNB).</td></tr>
+    <tr><td><strong>JNBI</strong> Jump if BR=0</td><td><code>JNBI &lt;label&gt;</code></td><td>When the BR register = 0.</td></tr>
+  </tbody>
+</table>
+
+<p>In the editor, the C-shaped jump block automatically encloses everything between the jump and its matching label. The label appears at the bottom of the C-shape.</p>
+
+<h4>Example — IF / THEN / ELSE pattern</h4>
+<pre>
+<span class="c">// IF block occupied THEN set Stop, ELSE set Clear</span>
+<span class="op">A</span>   I0.0
+<span class="op">JCN</span> <span class="lbl">APPR</span>        <span class="c">// skip to APPR if NOT occupied</span>
+<span class="op">SET</span>              <span class="c">// occupied: force RLO true</span>
+<span class="op">=</span>   Q1.0         <span class="c">// Stop aspect</span>
+<span class="op">JU</span>  <span class="lbl">DONE</span>
+<span class="lbl">APPR:</span>
+<span class="op">CLR</span>
+<span class="op">=</span>   Q1.0         <span class="c">// Clear aspect</span>
+<span class="lbl">DONE:</span>
+</pre>
+</section>
+
+<!-- ══════════ GROUPS ══════════ -->
+<section id="cat-groups">
+<h2><span class="badge misc">Groups &amp; Comments</span></h2>
+<h3>Logic group header</h3>
+<p>The <strong>[//Group N:]</strong> block marks the beginning of a logic group. Place one at the very top of each group's stack. The number is calculated automatically from its position in the workspace. You can give the group a descriptive name (e.g. "East Signal", "Crossing Gate").</p>
+<p>Each group corresponds to one of the 16 MultiLines in the Tower LCC+Q node. Each MultiLine can hold up to 256 characters.</p>
+
+<h3>Comment</h3>
+<p>The <strong>[//]</strong> block inserts a <code>//</code> comment line. Comments are stripped by the node's compiler and do not count toward byte usage. Use them freely to explain your logic.</p>
+<div class="warn"><strong>Caution:</strong> Do not put timer names (T0–T63) inside comments. The compiler scans comment text and may confuse timer names in comments with actual timer instructions.</div>
+</section>
+
+<!-- ══════════════════════════════════ -->
+<!--   TUTORIALS                        -->
+<!-- ══════════════════════════════════ -->
+
+<section id="tut-signal">
+<h2>Tutorial 1 — Simple Signal Logic</h2>
+<p>Goal: Set a signal to <em>Stop</em> (Q1.0 = 1) when a block is occupied (I0.0 = 1) or the facing-point lever is wrong (I0.1 = 0). Otherwise set <em>Clear</em> (Q1.0 = 0).</p>
+
+<h4>Step 1 — Think through the logic</h4>
+<p>Stop if: block occupied <strong>OR</strong> lever not set. Clear otherwise. Since the output follows the condition directly, use <code>=</code>.</p>
+
+<h4>Step 2 — Build the blocks</h4>
+<ol>
+  <li>Drag a <strong>Logic → OR</strong> block, set variable to <code>I0.0</code>.</li>
+  <li>Drag an <strong>OR NOT</strong> block below it, set variable to <code>I0.1</code>.</li>
+  <li>Drag an <strong>Outputs → Assign (=)</strong> block, set variable to <code>Q1.0</code>.</li>
+</ol>
+
+<h4>Resulting STL</h4>
+<pre>
+<span class="op">O</span>   I0.0    <span class="c">// block occupied</span>
+<span class="op">ON</span>  I0.1    <span class="c">// OR lever NOT in position</span>
+<span class="op">=</span>   Q1.0    <span class="c">// Stop signal</span>
+</pre>
+<div class="tip"><strong>Tip:</strong> The first instruction is <code>O</code> (OR), not <code>A</code>. Since it's the <em>first</em> instruction in the string, it just sets RLO = I0.0. The <em>second</em> instruction <code>ON</code> then ORs with that value.</div>
+</section>
+
+<section id="tut-timer">
+<h2>Tutorial 2 — Delayed Output (On-Delay Timer)</h2>
+<p>Goal: Activate a relay output (Q2.0) only after a block has been occupied for at least 3 seconds — to debounce brief detections.</p>
+
+<h4>Step 1 — Plan</h4>
+<p>Use an SD (on-delay) timer. The timer output (T-bit) goes true after 3 s of continuous input.</p>
+
+<h4>Step 2 — Build the blocks</h4>
+<ol>
+  <li>Drag a <strong>Logic → AND</strong> block, variable = <code>I0.0</code>.</li>
+  <li>Drag a <strong>Timers → Load (L)</strong> block, set value = <code>W#2#3</code> (3 seconds).</li>
+  <li>Drag a <strong>Timers → On-delay (SD)</strong> block, timer = <code>T0</code>.</li>
+  <li>Drag a <strong>Logic → AND</strong> block, variable = <code>T0</code>.</li>
+  <li>Drag an <strong>Outputs → Assign (=)</strong> block, variable = <code>Q2.0</code>.</li>
+</ol>
+
+<h4>Resulting STL</h4>
+<pre>
+<span class="op">A</span>   I0.0       <span class="c">// occupancy sensor</span>
+<span class="op">L</span>   W#2#3       <span class="c">// load 3 seconds</span>
+<span class="op">SD</span>  T0          <span class="c">// start on-delay timer (terminates string)</span>
+<span class="op">A</span>   T0          <span class="c">// new string: check if timer has finished</span>
+<span class="op">=</span>   Q2.0        <span class="c">// relay output</span>
+</pre>
+<div class="note"><strong>Note:</strong> The <code>SD</code> instruction terminates the first logic string. <code>A T0</code> starts a brand new string that checks whether the timer has timed out.</div>
+</section>
+
+<section id="tut-latch">
+<h2>Tutorial 3 — Latch / Memory (S and R)</h2>
+<p>Goal: Latch an alarm flag (M0.0) when any of three sensors fires. Clear the flag when a reset button (I3.0) is pressed.</p>
+
+<h4>Resulting STL</h4>
+<pre>
+<span class="c">// Set alarm flag if any sensor fires</span>
+<span class="op">O</span>   I0.0
+<span class="op">O</span>   I0.1
+<span class="op">O</span>   I0.2
+<span class="op">S</span>   M0.0    <span class="c">// latch ON — stays true even when sensors clear</span>
+
+<span class="c">// Clear alarm flag on button press</span>
+<span class="op">A</span>   I3.0
+<span class="op">R</span>   M0.0    <span class="c">// latch OFF</span>
+
+<span class="c">// Drive output from flag</span>
+<span class="op">A</span>   M0.0
+<span class="op">=</span>   Q3.0    <span class="c">// alarm indicator</span>
+</pre>
+</section>
+
+<section id="tut-nesting">
+<h2>Tutorial 4 — Grouped Conditions (Nesting)</h2>
+<p>Goal: Protect a junction — allow route only if (Route A set AND A-path clear) OR (Route B set AND B-path clear), AND no opposing train detected.</p>
+
+<h4>Resulting STL</h4>
+<pre>
+<span class="op">O</span>(
+  <span class="op">A</span>  I1.0   <span class="c">// Route A lever</span>
+  <span class="op">A</span>  I1.1   <span class="c">// Route A path clear</span>
+<span class="op">)</span>
+<span class="op">O</span>(
+  <span class="op">A</span>  I1.2   <span class="c">// Route B lever</span>
+  <span class="op">A</span>  I1.3   <span class="c">// Route B path clear</span>
+<span class="op">)</span>
+<span class="op">AN</span> I2.0     <span class="c">// AND no opposing train</span>
+<span class="op">=</span>  Q3.0     <span class="c">// Route permitted</span>
+</pre>
+<p>The two <code>O( … )</code> groups each evaluate independently, then their results are OR'd together, then AND NOT'd with the opposing train sensor.</p>
+</section>
+
+<!-- ══════════ LIMITS ══════════ -->
+<section id="limits">
+<h2>Byte Limits</h2>
+<ul>
+  <li>Each logic group (MultiLine) holds <strong>256 characters</strong> max.</li>
+  <li>There are <strong>16 logic groups</strong>, for a total of 4,096 characters.</li>
+  <li>Comments are stripped at compile time and do <strong>not</strong> count toward the 256-character limit.</li>
+  <li>Use <strong>Compact</strong> output format to save bytes (removes all spaces).</li>
+  <li>The byte count bar turns <strong>amber</strong> at 90% capacity and <strong>red</strong> if you exceed 256 characters.</li>
+  <li>Spaces between the operator and variable count. <code>A I0.0</code> = 6 bytes; <code>AI0.0</code> = 5 bytes.</li>
+</ul>
+</section>
+
+<!-- ══════════ TIPS ══════════ -->
+<section id="tips">
+<h2>Tips &amp; Gotchas</h2>
+<ul>
+  <li><strong>First instruction in a string is special.</strong> The very first bit instruction after a terminating operation starts a new logic string — it <em>sets</em> the RLO from scratch, not combines. This means <code>O I0.0</code> as a first instruction acts exactly like <code>A I0.0</code>.</li>
+  <li><strong>Multiple <code>=</code> assignments.</strong> You can chain several <code>= Q…</code> blocks one after another — they all receive the same RLO value. Useful for driving multiple outputs from one condition.</li>
+  <li><strong>Label length.</strong> Jump labels must be 1–4 alphanumeric characters. <code>E1</code>, <code>STOP</code>, <code>AB1</code> are valid. <code>STOP1</code> (5 chars) is not.</li>
+  <li><strong>No label in the middle of a string.</strong> Jump targets must appear at the beginning of a statement, not in the middle of a logic chain.</li>
+  <li><strong>Timer names in comments.</strong> Avoid writing <code>T0</code>, <code>T1</code>, …, <code>T63</code> anywhere in a comment. The compiler's pre-processor scans comment text and may accidentally interpret them as timer references.</li>
+  <li><strong>FP/FN memory variable.</strong> Each FP or FN instruction needs its own dedicated M variable. Using the same M for two edge detectors or for other logic will cause incorrect results.</li>
+  <li><strong>Jumps are forward-only.</strong> You cannot create loops. This is a deliberate safety feature of the Tower LCC+Q implementation.</li>
+  <li><strong>20 ms update cycle.</strong> Very brief LCC events (shorter than 20 ms) may be missed by the logic. Space your sensors accordingly at high train speeds.</li>
+  <li><strong>Q can be read back.</strong> A Q variable you assign in one group can be read in another group on the same node using <code>A Q…</code>, etc. — treating it as an internal flag.</li>
+  <li><strong>Reboot to compile.</strong> After writing new logic via JMRI, you <em>must</em> reboot the node (<em>Configure Nodes → More… → Reboot</em>) to trigger the compile cycle. Check Syntax Messages 1–3 after the reboot for errors.</li>
+</ul>
+</section>
+
+<!-- ══════════ REFERENCES ══════════ -->
+<section id="ref">
+<h2>External References</h2>
+<ul>
+  <li><a href="https://lnevo.github.io/stl-studio" target="_blank">STL Studio (live app)</a></li>
+  <li><a href="https://www.rr-cirkits.com/manuals/TowerLCC+Q-manual-d.pdf" target="_blank">Tower LCC+Q Manual (PDF)</a> — full hardware &amp; STL reference</li>
+  <li><a href="https://groups.io/g/layoutcommandcontrol/files/Understanding%20the%20STL%20Logic%20String.pdf" target="_blank">Understanding the STL Logic String (PDF)</a> — RLO/FC deep-dive</li>
+  <li><a href="https://layoutcommand.store/q-debugger" target="_blank">Q-Debugger</a> — web-based STL simulator showing RLO, /FC, BR in real time</li>
+  <li><a href="https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml" target="_blank">JMRI OpenLCB STL Editor Help</a></li>
+</ul>
+</section>
+
+</main>
+</div>
+
+<script>
+  // Highlight active nav link based on scroll position
+  var sections = document.querySelectorAll('section[id], h2[id]');
+  var navLinks = document.querySelectorAll('nav a[href^="#"]');
+  function onScroll() {
+    var scrollY = window.scrollY + 80;
+    var current = '';
+    sections.forEach(function(s) {
+      if (s.offsetTop <= scrollY) current = s.id;
+    });
+    navLinks.forEach(function(a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>
