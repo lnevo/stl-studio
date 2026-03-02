@@ -69,12 +69,62 @@
     return xml;
   }
 
-  /** Build XML for a chain of block descriptors (first block with <next> to rest). */
+  /** Build XML for a chain of block descriptors (first block with <next> to rest). Descriptors may have .body for C-shaped blocks. */
   function chainToXml(descriptors) {
     if (descriptors.length === 0) return '';
     var first = descriptors[0];
     var nextXml = descriptors.length > 1 ? chainToXml(descriptors.slice(1)) : null;
-    return blockXml(first.type, first.fields, nextXml);
+    var stmtName = first.body !== undefined ? 'BODY' : null;
+    var stmtList = first.body;
+    return blockXml(first.type, first.fields, nextXml, stmtName, stmtList);
+  }
+
+  var NEST_START_TO_C = {
+    stl_or_group_start: 'stl_or_group_c',
+    stl_and_group_start: 'stl_and_group_c',
+    stl_on_group_start: 'stl_on_group_c',
+    stl_x_group_start: 'stl_x_group_c',
+    stl_xn_group_start: 'stl_xn_group_c'
+  };
+
+  /**
+   * Merge nest start + body + nest end into single C-shaped descriptors (e.g. stl_or_group_c with .body).
+   * Finds innermost group_end, matches to its group_start, replaces run with one descriptor; repeats until none left.
+   */
+  function mergeNestGroups(list) {
+    var endIdx = -1;
+    for (var k = 0; k < list.length; k++) {
+      if (list[k].type === 'stl_group_end') { endIdx = k; break; }
+    }
+    if (endIdx < 0) return list;
+    var depth = 1;
+    var startIdx = -1;
+    for (var i = endIdx - 1; i >= 0; i--) {
+      if (list[i].type === 'stl_group_end') depth++;
+      else if (NEST_START_TO_C[list[i].type]) {
+        depth--;
+        if (depth === 0) { startIdx = i; break; }
+      }
+    }
+    if (startIdx < 0) return list;
+    var body = list.slice(startIdx + 1, endIdx);
+    var mergedBody = mergeNestGroups(body);
+    var cType = NEST_START_TO_C[list[startIdx].type];
+    if (!cType) return list;
+    var newItem = { type: cType, fields: {}, body: mergedBody };
+    var newList = list.slice(0, startIdx).concat([newItem], list.slice(endIdx + 1));
+    return mergeNestGroups(newList);
+  }
+
+  /** Run mergeNestGroups on the list and recursively on every descriptor's .body (e.g. inside jump C-shapes). */
+  function mergeNestGroupsRecursive(list) {
+    var merged = mergeNestGroups(list);
+    for (var i = 0; i < merged.length; i++) {
+      if (merged[i].body && Array.isArray(merged[i].body)) {
+        merged[i].body = mergeNestGroupsRecursive(merged[i].body);
+      }
+    }
+    return merged;
   }
 
   function escapeXml(s) {
@@ -514,31 +564,38 @@
   }
 
   /**
-   * Merge JC/JCN/JU + optional body + matching label into a single C-shaped block descriptor.
-   * Only merges when the matching label appears *after* the jump (we scan forward).
-   * If the label appears before the jump (e.g. E1: ... JC E1 loop-back), we leave separate
-   * JC and Label blocks so the C-shaped block is only used for the "jump → body → label" pattern.
+   * Merge JC/JCN/JU + body + matching label into a single C-shaped block when the label appears *after* the jump.
+   * Only skip merging when the label appears *before* the jump (loop-back: E1: ... JC E1), so we keep separate blocks.
+   * When merging, we collect everything until we find our label (including other jumps/labels); then we recursively
+   * merge the body so nested jumps become C-shapes too.
    */
   function mergeJumpLabel(list) {
     var result = [];
     var i = 0;
+    function labelAppearsBefore(idx, lab) {
+      for (var k = 0; k < idx; k++) {
+        var b = list[k];
+        if (b.type === 'stl_label' && b.fields && String(b.fields.LABEL).trim().slice(0, 4) === lab) return true;
+      }
+      return false;
+    }
     while (i < list.length) {
       var item = list[i];
       if (item.type === 'stl_jc' || item.type === 'stl_jcn' || item.type === 'stl_ju') {
         var label = (item.fields && item.fields.LABEL) ? String(item.fields.LABEL).trim().slice(0, 4) : 'E1';
+        if (labelAppearsBefore(i, label)) {
+          result.push(item);
+          i++;
+          continue;
+        }
         var body = [];
         var j = i + 1;
         while (j < list.length) {
           var nextItem = list[j];
           if (nextItem.type === 'stl_label' && nextItem.fields && String(nextItem.fields.LABEL).trim().slice(0, 4) === label) {
             var cType = item.type === 'stl_jc' ? 'stl_jump_c_jc' : item.type === 'stl_jcn' ? 'stl_jump_c_jcn' : 'stl_jump_c_ju';
-            result.push({ type: cType, fields: { LABEL: label }, body: body });
+            result.push({ type: cType, fields: { LABEL: label }, body: mergeJumpLabel(body) });
             i = j + 1;
-            break;
-          }
-          if (nextItem.type === 'stl_jc' || nextItem.type === 'stl_jcn' || nextItem.type === 'stl_ju' || nextItem.type === 'stl_label') {
-            result.push(item);
-            i++;
             break;
           }
           body.push(nextItem);
@@ -564,7 +621,7 @@
   var FLAT_BLOCK_SPACING = 50;
   function buildXml(list) {
     if (list.length === 0) return '';
-    var merged = mergeJumpLabel(list);
+    var merged = mergeNestGroupsRecursive(mergeJumpLabel(list));
     var nextXml = null;
     for (var i = merged.length - 1; i >= 0; i--) {
       var item = merged[i];

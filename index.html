@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.20';</script>
+  <script>var APP_VERSION = '1.21';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -784,12 +784,11 @@
             name: 'Nesting',
             colour: '#c47c30',
             contents: [
-              { kind: 'block', type: 'stl_or_group_start' },
-              { kind: 'block', type: 'stl_on_group_start' },
-              { kind: 'block', type: 'stl_and_group_start' },
-              { kind: 'block', type: 'stl_x_group_start' },
-              { kind: 'block', type: 'stl_xn_group_start' },
-              { kind: 'block', type: 'stl_group_end' }
+              { kind: 'block', type: 'stl_or_group_c' },
+              { kind: 'block', type: 'stl_on_group_c' },
+              { kind: 'block', type: 'stl_and_group_c' },
+              { kind: 'block', type: 'stl_x_group_c' },
+              { kind: 'block', type: 'stl_xn_group_c' }
             ]
           },
           {
@@ -2703,7 +2702,15 @@
       };
 
       document.getElementById('btnExample').onclick = function () {
-        // Example: clear RLO, set 3 outputs false, then set one true from inputs and jump
+        // First JC E1 = C-shape (wraps body up to the one E1 label). Second JC E1 inside = single-line (no new label).
+        var jcBody = '<block type="stl_and"><field name="VAR">I0.0</field>' +
+          '<next><block type="stl_assign"><field name="VAR">Q0.1</field>' +
+          '<next><block type="stl_jc"><field name="LABEL">E1</field>' +
+          '<next><block type="stl_assign"><field name="VAR">Q0.0</field></block>' +
+          '</next></block></next></block></next></block>';
+        var outerJc = '<block type="stl_jump_c_jc" x="0" y="0">' +
+          '<field name="LABEL">E1</field><field name="LABEL_DISPLAY">E1</field>' +
+          '<statement name="BODY">' + jcBody + '</statement></block>';
         var example = '<xml xmlns="https://developers.google.com/blockly/xml">' +
           '<block type="stl_clear" x="20" y="20">' +
           '<next><block type="stl_assign"><field name="VAR">Q0.0</field>' +
@@ -2712,14 +2719,8 @@
           '<next><block type="stl_or"><field name="VAR">I0.4</field>' +
           '<next><block type="stl_or"><field name="VAR">I0.5</field>' +
           '<next><block type="stl_assign"><field name="VAR">Q0.2</field>' +
-          '<next><block type="stl_jc"><field name="LABEL">E1</field>' +
-          '<next><block type="stl_and"><field name="VAR">I0.0</field>' +
-          '<next><block type="stl_assign"><field name="VAR">Q0.1</field>' +
-          '<next><block type="stl_jc"><field name="LABEL">E1</field>' +
-          '<next><block type="stl_assign"><field name="VAR">Q0.0</field>' +
-          '<next><block type="stl_label"><field name="LABEL">E1</field></block>' +
-          '</next></block></next></block></next></block></next></block></next></block>' +
-          '</next></block></next></block></next></block></next></block></next></block>' +
+          '<next>' + outerJc + '</next></block></next></block></next></block>' +
+          '</next></block></next></block></next></block></next></block>' +
           '</next></block></xml>';
         try {
           Blockly.Xml.domToWorkspace(xmlTextToDom(example), ws);

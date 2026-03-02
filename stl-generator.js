@@ -193,23 +193,25 @@
     gen.groupIndex = n + 1;
     return withNext(block, gen, '// Group ' + n + ': ' + name + '\n');
   };
-  stlGenerator.forBlock['stl_or_group_start'] = function (block, gen) {
-    return withNext(block, gen, 'O(\n');
+  stlGenerator.forBlock['stl_or_group_c'] = function (block, gen) {
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    return withNext(block, gen, 'O(\n' + (bodyCode || '') + ')\n');
   };
-  stlGenerator.forBlock['stl_and_group_start'] = function (block, gen) {
-    return withNext(block, gen, 'A(\n');
+  stlGenerator.forBlock['stl_and_group_c'] = function (block, gen) {
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    return withNext(block, gen, 'A(\n' + (bodyCode || '') + ')\n');
   };
-  stlGenerator.forBlock['stl_on_group_start'] = function (block, gen) {
-    return withNext(block, gen, 'ON(\n');
+  stlGenerator.forBlock['stl_on_group_c'] = function (block, gen) {
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    return withNext(block, gen, 'ON(\n' + (bodyCode || '') + ')\n');
   };
-  stlGenerator.forBlock['stl_x_group_start'] = function (block, gen) {
-    return withNext(block, gen, 'X(\n');
+  stlGenerator.forBlock['stl_x_group_c'] = function (block, gen) {
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    return withNext(block, gen, 'X(\n' + (bodyCode || '') + ')\n');
   };
-  stlGenerator.forBlock['stl_xn_group_start'] = function (block, gen) {
-    return withNext(block, gen, 'XN(\n');
-  };
-  stlGenerator.forBlock['stl_group_end'] = function (block, gen) {
-    return withNext(block, gen, ')\n');
+  stlGenerator.forBlock['stl_xn_group_c'] = function (block, gen) {
+    var bodyCode = gen.statementToCode(block, 'BODY');
+    return withNext(block, gen, 'XN(\n' + (bodyCode || '') + ')\n');
   };
 
   global.stlGenerator = stlGenerator;
