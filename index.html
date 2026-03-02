@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.39';</script>
+  <script>var APP_VERSION = '1.40';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -1889,6 +1889,10 @@
           return;
         }
         var base = location.origin + location.pathname;
+        var shareCacheBuster = Date.now().toString(36);
+        function buildShareUrl(paramName, encodedValue) {
+          return base + '?' + paramName + '=' + encodedValue + '&cb=' + shareCacheBuster;
+        }
         var fullEncoded = compressStr(JSON.stringify(payload));
         var namesPayload = buildSharePayloadNamesOnly();
         var namesEncoded = namesPayload ? compressStr(JSON.stringify(namesPayload)) : '';
@@ -1923,7 +1927,7 @@
         var onlyStlOption = !showFull && !showNames && stlFits;
 
         if (onlyStlOption) {
-          var stlUrl = base + '?stl=' + stlEncoded;
+          var stlUrl = buildShareUrl('stl', stlEncoded);
           navigator.clipboard.writeText(stlUrl).then(function () {
             if (feedbackEl) {
               feedbackEl.classList.add('copy-success');
@@ -1971,7 +1975,7 @@
           btn.className = 'primary';
           btn.textContent = 'Copy link (logic + names + event IDs)';
           btn.onclick = function () {
-            var url = base + '?d=' + fullEncoded;
+            var url = buildShareUrl('d', fullEncoded);
             navigator.clipboard.writeText(url).then(function () {
               btn.textContent = 'Copied!';
               setTimeout(function () { btn.textContent = 'Copy link (logic + names + event IDs)'; }, 1500);
@@ -1985,7 +1989,7 @@
           btn.className = showFull ? '' : 'primary';
           btn.textContent = 'Copy link with names (no event IDs)';
           btn.onclick = function () {
-            var url = base + '?d=' + namesEncoded;
+            var url = buildShareUrl('d', namesEncoded);
             navigator.clipboard.writeText(url).then(function () {
               btn.textContent = 'Copied!';
               setTimeout(function () { btn.textContent = 'Copy link with names (no event IDs)'; }, 1500);
@@ -1998,7 +2002,7 @@
           btn.type = 'button';
           btn.textContent = 'Copy link with STL only';
           btn.onclick = function () {
-            var url = base + '?stl=' + stlEncoded;
+            var url = buildShareUrl('stl', stlEncoded);
             navigator.clipboard.writeText(url).then(function () {
               btn.textContent = 'Copied!';
               setTimeout(function () { btn.textContent = 'Copy link with STL only'; }, 1500);
@@ -2064,6 +2068,7 @@
                   updateStl();
                   var params = new URLSearchParams(location.search);
                   params.delete('d');
+                  params.delete('cb');
                   var q = params.toString();
                   var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
                   history.replaceState({}, '', clean);
@@ -2096,6 +2101,7 @@
                 updateStl();
                 var params = new URLSearchParams(location.search);
                 params.delete('stl');
+                params.delete('cb');
                 var q = params.toString();
                 var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
                 history.replaceState({}, '', clean);
@@ -2125,6 +2131,7 @@
           updateStl();
           var params = new URLSearchParams(location.search);
           params.delete('s');
+          params.delete('cb');
           var q = params.toString();
           var clean = location.pathname + (q ? '?' + q : '') + (location.hash || '');
           history.replaceState({}, '', clean);
