@@ -295,7 +295,7 @@
       if (rest.length === 0) break;
 
       var m;
-      if (groupDepth > 0 && rest.charAt(0) === ')') {
+      if (rest.charAt(0) === ')') {
         list.push({ type: 'stl_group_end', fields: {} });
         groupDepth--;
         rest = rest.slice(1);
@@ -475,20 +475,15 @@
         triedCompact = true;
         continue;
       }
-      if ((m = new RegExp('^JC' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jc' } });
+      // Longer opcodes must be tested before any prefix they share (e.g. JCN/JCB before JC, JNBI before JNB).
+      if ((m = new RegExp('^JNBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jnbi' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
       }
       if ((m = new RegExp('^JCN' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
         list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jcn' } });
-        rest = rest.slice(m[0].length);
-        triedCompact = true;
-        continue;
-      }
-      if ((m = new RegExp('^JU' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'ju' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
@@ -511,8 +506,14 @@
         triedCompact = true;
         continue;
       }
-      if ((m = new RegExp('^JNBI' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
-        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jnbi' } });
+      if ((m = new RegExp('^JC' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'jc' } });
+        rest = rest.slice(m[0].length);
+        triedCompact = true;
+        continue;
+      }
+      if ((m = new RegExp('^JU' + OPT + '(' + LABEL_PATTERN + ')', 'i').exec(rest))) {
+        list.push({ type: 'stl_jump', fields: { LABEL: m[1].slice(0, 4), COND: 'ju' } });
         rest = rest.slice(m[0].length);
         triedCompact = true;
         continue;
