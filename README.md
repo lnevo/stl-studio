@@ -101,6 +101,15 @@ When I1.0 is true, the timer starts. `A T3` is a one-instruction logic string: Q
 - **Reference:** [Understanding the STL Logic String](https://groups.io/g/layoutcommandcontrol/files/Understanding%20the%20STL%20Logic%20String.pdf) (PDF)
 - **Simulate STL and view RLO/FC:** [Q-debugger](https://layoutcommand.store/q-debugger) (web-based)
 
+## Testing and regressions
+
+Before changing the STL parser or code generator, see **[TESTING.md](TESTING.md)** for:
+
+- **Pre-release checklist** — what to test before each release (import, config backup, export, byte count, round-trip).
+- **Rules** — don’t change parsing/STL output unless fixing a bug or intentionally improving behavior; run the checklist when you do.
+- **Config backup** — after import, variables must stay correct (no “all I0.0/Q0.0” or M→I/Q).
+- **Scripts** — `node scripts/refresh-git-upload.js` (checkpoint), `node scripts/commit-push-git-upload.js "message"` (commit and push), `node scripts/full-round.js "message"` (check → refresh → commit and push). Regression checks must pass before refreshing unless you use `--exempt`.
+
 ## Reference
 
 - [JMRI OpenLCB STL Editor](https://www.jmri.org/help/en/package/jmri/jmrix/openlcb/swing/stleditor/StlEditorPane.shtml)
