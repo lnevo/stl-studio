@@ -287,7 +287,7 @@
       type: 'stl_nest_c',
       message0: '%1 %2 (',
       args0: [
-        { type: 'field_label', name: 'OPCODE_LABEL', text: 'O' },
+        { type: 'field_label', name: 'OPCODE_LABEL', text: '[O]' },
         { type: 'field_dropdown', name: 'NEST_TYPE', options: NEST_TYPE_OPTS }
       ],
       message1: '  %1',
@@ -301,8 +301,9 @@
     },
     {
       type: 'stl_group',
-      message0: '[// Group] Group Description %1',
+      message0: '%1 %2',
       args0: [
+        { type: 'field_label', name: 'GROUP_LABEL', text: '[//Group 0:]' },
         { type: 'field_input', name: 'NAME', text: '', maxLength: 60 },
       ],
       message1: '  %1',
