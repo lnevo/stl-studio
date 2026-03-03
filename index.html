@@ -4,7 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>STL Studio</title>
-  <script>var APP_VERSION = '1.44';</script>
+  <meta property="og:title" content="STL Studio">
+  <meta property="og:description" content="Visual block editor for STL logic on Tower LCC+Q. Build signal logic, copy the generated code into your node.">
+  <meta property="og:image" content="https://lnevo.github.io/stl-studio/og-image.png">
+  <meta property="og:url" content="https://lnevo.github.io/stl-studio">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="STL Studio">
+  <meta name="twitter:description" content="Visual block editor for STL logic on Tower LCC+Q. Build signal logic, copy the generated code into your node.">
+  <meta name="twitter:image" content="https://lnevo.github.io/stl-studio/og-image.png">
+  <script>var APP_VERSION = '1.45';</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23252830'/%3E%3Crect x='5' y='5' width='9' height='7' rx='1.5' fill='%234a9eff'/%3E%3Crect x='18' y='5' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.75'/%3E%3Crect x='5' y='20' width='9' height='7' rx='1.5' fill='%234a9eff' opacity='.5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="https://unpkg.com/blockly/blockly.min.css" />
   <style>
@@ -106,6 +115,36 @@
     #blocklyDiv {
       flex: 1;
       min-width: 320px;
+      position: relative;
+    }
+    /* Pin zoom/home/trash to upper-right of viewport; darken controls */
+    #blocklyDiv .blocklyZoom>image,
+    #blocklyDiv .blocklyZoom>svg>image,
+    #blocklyDiv .blocklyZoom .blocklyZoomImage {
+      opacity: 0.75;
+      filter: brightness(0.85);
+    }
+    #blocklyDiv .blocklyZoom>image:hover,
+    #blocklyDiv .blocklyZoom>svg>image:hover,
+    #blocklyDiv .blocklyZoom .blocklyZoomImage:hover {
+      opacity: 0.95;
+      filter: brightness(1);
+    }
+    #blocklyDiv .blocklyZoom>image:active,
+    #blocklyDiv .blocklyZoom>svg>image:active,
+    #blocklyDiv .blocklyZoom .blocklyZoomImage:active {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    #blocklyDiv .blocklyTrash>image,
+    #blocklyDiv .blocklyTrash>svg>image {
+      opacity: 0.75;
+      filter: brightness(0.85);
+    }
+    #blocklyDiv .blocklyTrash>image:hover,
+    #blocklyDiv .blocklyTrash>svg>image:hover {
+      opacity: 0.95;
+      filter: brightness(1);
     }
     /* Toolbox (left menu): dark text on grey so category names are readable */
     body .blocklyToolboxDiv,
@@ -893,7 +932,42 @@
       });
       if (Blockly.Tooltip) Blockly.Tooltip.HOVER_MS = TOOLTIP_HOVER_MS;
       function resizeBlocklyWorkspace() {
-        if (typeof Blockly !== 'undefined' && ws) Blockly.svgResize(ws);
+        if (typeof Blockly !== 'undefined' && ws) {
+          Blockly.svgResize(ws);
+          pinWorkspaceControlsToViewport(ws);
+        }
+      }
+      function pinWorkspaceControlsToViewport(workspace) {
+        var div = document.getElementById('blocklyDiv');
+        if (!div || !workspace) return;
+        var viewW = div.clientWidth || 400;
+        var viewH = div.clientHeight || 300;
+        var margin = 12;
+        var ctrlW = 32;
+        var zoomH = 96;
+        var gap = 12;
+        var scrollX = 0, scrollY = 0;
+        if (workspace.getMetrics) {
+          var m = workspace.getMetrics();
+          if (m && m.viewLeft != null) scrollX = m.viewLeft;
+          if (m && m.viewTop != null) scrollY = m.viewTop;
+        } else if (workspace.scrollX != null) scrollX = workspace.scrollX;
+        if (workspace.scrollY != null) scrollY = workspace.scrollY;
+        var left = scrollX + viewW - ctrlW - margin;
+        var topZoom = scrollY + margin;
+        var topTrash = scrollY + margin + zoomH + gap + 5;
+        var zoomBtn = div.querySelector('.blocklyZoom');
+        if (zoomBtn) {
+          var zoomG = zoomBtn.closest ? zoomBtn.closest('g') : zoomBtn.parentNode;
+          var zoomContainer = (zoomG && zoomG.parentNode) ? zoomG.parentNode : zoomG;
+          if (zoomContainer && zoomContainer.setAttribute) zoomContainer.setAttribute('transform', 'translate(' + left + ',' + topZoom + ')');
+        }
+        var trashEl = div.querySelector('.blocklyTrash') || div.querySelector('.blocklyTrashCan');
+        if (trashEl) {
+          var trashG = trashEl.closest ? trashEl.closest('g') : trashEl.parentNode;
+          var leftTrash = left - 8;
+          if (trashG && trashG.setAttribute) trashG.setAttribute('transform', 'translate(' + leftTrash + ',' + topTrash + ')');
+        }
       }
       if (typeof window !== 'undefined' && window.addEventListener) {
         window.addEventListener('resize', resizeBlocklyWorkspace);
@@ -1580,14 +1654,14 @@
               var w = startRight - e.clientX;
               w = Math.max(minW, Math.min(maxW, w));
               stlPanel.style.setProperty('--stl-panel-width', w + 'px');
-              if (typeof Blockly !== 'undefined' && ws) Blockly.svgResize(ws);
+              if (typeof Blockly !== 'undefined' && ws) { Blockly.svgResize(ws); pinWorkspaceControlsToViewport(ws); }
             }
             function stop() {
               document.removeEventListener('mousemove', move);
               document.removeEventListener('mouseup', stop);
               document.body.style.cursor = '';
               document.body.style.userSelect = '';
-              if (typeof Blockly !== 'undefined' && ws) Blockly.svgResize(ws);
+              if (typeof Blockly !== 'undefined' && ws) { Blockly.svgResize(ws); pinWorkspaceControlsToViewport(ws); }
             }
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
@@ -2179,6 +2253,7 @@
                   applySharePayload(payload);
                   connectImportedStack(workspace);
                   updateStl();
+                  setTimeout(function () { pinWorkspaceControlsToViewport(workspace); }, 50);
                 }
               }
             } catch (e) {}
@@ -2207,6 +2282,7 @@
                 Blockly.Xml.domToWorkspace(dom, workspace);
                 connectImportedStack(workspace);
                 updateStl();
+                setTimeout(function () { pinWorkspaceControlsToViewport(workspace); }, 50);
               }
             } catch (e) {}
           }
@@ -2232,6 +2308,7 @@
           Blockly.Xml.domToWorkspace(dom, workspace);
           connectImportedStack(workspace);
           updateStl();
+          setTimeout(function () { pinWorkspaceControlsToViewport(workspace); }, 50);
         } catch (e) {}
         clearShareParams('s');
       }
@@ -3050,10 +3127,12 @@
           Blockly.Xml.domToWorkspace(xmlDom, ws);
           addVariableBlocksFromBackup(ws);
           if (window.stlFriendlyNames && Object.keys(window.stlFriendlyNames).length) refreshBlockVarOptions(ws);
+          setTimeout(function () { pinWorkspaceControlsToViewport(ws); }, 50);
           closeImportModal();
           var runConnect = function () {
             if (clearBeforeImport) connectImportedStack(ws);
             updateStl();
+            setTimeout(function () { pinWorkspaceControlsToViewport(ws); }, 50);
           };
           if (typeof requestAnimationFrame !== 'undefined') {
             requestAnimationFrame(runConnect);
@@ -3374,6 +3453,7 @@
 
       loadStateFromUrl(ws);
       updateStl();
+      setTimeout(function () { if (ws) pinWorkspaceControlsToViewport(ws); }, 150);
       }
       loadBlocklyThenInit();
     })();
